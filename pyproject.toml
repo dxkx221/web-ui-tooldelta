@@ -1,0 +1,74 @@
+[tool.poetry]
+name = "Tooldelta"
+version = "0.0.0"                                              # This field is automatically set to the value in the version file
+description = "Plugin Loader for NeteaseRentalServer on Panel"
+authors = ["ToolDelta Studio Staff"]
+license = ""
+
+readme = "README.md"
+homepage = "https://github.com/ToolDelta-Basic/ToolDelta"
+repository = "https://github.com/ToolDelta-Basic/ToolDelta"
+
+# Please don't change this manually, your changes may invalidate other people's package management, use poetry to make changes!
+[tool.poetry.dependencies]
+python = ">=3.10,<3.13"
+colorama = "^0.4.6"
+pyspeedtest = "1.2.7"
+aiohttp = "^3.9.3"
+flask = "^3.0.2"
+flask-sock = "^0.7.0"
+websocket-client = "^1.7.0"
+pyyaml = "6.0.1"
+brotli = "^1.1.0"
+websockets = "^12.0"
+tqdm = "^4.66.4"
+anyio = "^4.4.0"
+requests = "^2.32.3"
+numpy = "^2.1.0"
+protobuf = "^6.30.1"
+grpcio = "^1.71.0"
+msgpack = "^1.1.0"
+nbtlib = "^2.0.4"
+rich = "^14.1.0"
+lxml = ">=5.3,<7"
+
+[[tool.poetry.source]]
+name = "mirrors"
+url = "http://mirrors.aliyun.com/pypi/simple/"
+priority = "primary"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "F",     # Pyflakes
+    "W",     # pycodestyle warnings
+    "E",     # pycodestyle errors
+    "UP",    # pyupgrade
+    "ASYNC", # flake8-async
+    "C4",    # flake8-comprehensions
+    "T10",   # flake8-debugger
+    "PYI",   # flake8-pyi
+    "PT",    # flake8-pytest-style
+    "Q",     # flake8-quotes
+    "RUF",   # Ruff-specific rules
+]
+ignore = [
+    "E402",   # module-import-not-at-top-of-file
+    "E501",   # line-too-long
+    "UP037",  # quoted-annotation
+    "RUF001", # ambiguous-unicode-character-string
+    "RUF002", # ambiguous-unicode-character-docstring
+    "RUF003", # ambiguous-unicode-character-comment
+]
+
+[tool.pyright]
+typeCheckingMode = "basic"

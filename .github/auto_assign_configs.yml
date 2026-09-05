@@ -1,0 +1,12 @@
+addReviewers: true
+addAssignees: false
+reviewers:
+  - xingchentye
+  - wling-art
+  - SuperScript-PRC
+assignees:
+  - SuperScript-PRC
+  - wling-art
+  - xingchentye
+numberOfAssignees: 2
+numberOfReviewers: 2

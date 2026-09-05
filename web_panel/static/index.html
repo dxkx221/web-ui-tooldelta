@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>神翼面板 · ToolDelta Server Console</title>
+<link rel="stylesheet" href="/style.css?v=20260905-guide2" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">TD</div>
+      <div class="brand-text">
+        <div class="brand-name">神翼面板</div>
+        <div class="brand-sub">Server Console</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <a class="nav-item active" href="/" data-view="dashboard"><span class="ic">01</span>控制台</a>
+      <a class="nav-item" href="/chat" data-view="chat"><span class="ic">02</span>消息</a>
+      <a class="nav-item" href="/players" data-view="players"><span class="ic">03</span>玩家</a>
+      <a class="nav-item" href="/world" data-view="world"><span class="ic">04</span>服务器</a>
+      <a class="nav-item" href="/plugins" data-view="plugins"><span class="ic">05</span>插件</a>
+      <a class="nav-item" href="/market" data-view="market"><span class="ic">06</span>市场</a>
+      <a class="nav-item" href="/settings" data-view="settings"><span class="ic">07</span>设置</a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="conn-dot" id="conn-dot"></div>
+      <span id="conn-text">连接中…</span>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-title" id="topbar-title">控制台</div>
+      <div class="topbar-status">
+        <span class="chip" id="chip-state">未启动</span>
+        <span class="chip" id="chip-launcher">—</span>
+        <span class="chip" id="chip-players">在线 0</span>
+        <span class="chip" id="chip-bot">机器人 —</span>
+      </div>
+      <div class="topbar-actions" id="topbar-actions">
+        <button class="btn" id="btn-start">启动服务</button>
+        <button class="btn btn-danger" id="btn-stop">停止服务</button>
+      </div>
+    </header>
+
+    <section class="view active" id="view-dashboard">
+      <div class="page-hero">
+        <div>
+          <div class="page-kicker">CONSOLE</div>
+          <h2>控制台</h2>
+          <p>服务器的指挥中心：看状态、启停服务，需要干什么从这里出发。</p>
+        </div>
+        <div class="page-hero-badge">指挥中心</div>
+      </div>
+      <div class="card panel guide-card" id="guide-card" style="display:none">
+        <div class="ops-card-head">
+          <div><strong>新手引导</strong><span>三步走：让原本不支持插件的服务器也能装插件</span></div>
+          <button class="mini-btn" id="guide-dismiss">我知道了</button>
+        </div>
+        <div class="guide-steps" id="guide-steps"></div>
+      </div>
+      <div class="cards">
+        <div class="card stat">
+          <div class="stat-label">服务器状态</div>
+          <div class="stat-value" id="dash-state">—</div>
+        </div>
+        <div class="card stat">
+          <div class="stat-label">启动方式</div>
+          <div class="stat-value" id="dash-launcher">—</div>
+        </div>
+        <div class="card stat">
+          <div class="stat-label">在线玩家</div>
+          <div class="stat-value" id="dash-players">0</div>
+        </div>
+        <div class="card stat">
+          <div class="stat-label">机器人 ID</div>
+          <div class="stat-value" id="dash-bot">—</div>
+        </div>
+      </div>
+      <div class="card panel">
+        <div class="panel-head">
+          <div>
+            <div>常用入口</div>
+            <span class="head-sub">日常操作从这里快速进入</span>
+          </div>
+        </div>
+        <div class="quick-links" id="dash-quick-links">
+          <button class="quick-link" data-go="chat"><span class="ql-ic"></span><span>发消息 / 执行命令</span></button>
+          <button class="quick-link" data-go="players"><span class="ql-ic"></span><span>管理玩家</span></button>
+          <button class="quick-link" data-go="world"><span class="ql-ic"></span><span>调整服务器规则</span></button>
+          <button class="quick-link" data-go="plugins"><span class="ql-ic"></span><span>管理插件</span></button>
+          <button class="quick-link" data-go="market"><span class="ql-ic"></span><span>安装新插件</span></button>
+          <button class="quick-link" data-go="settings"><span class="ql-ic"></span><span>启动配置 / 文件</span></button>
+        </div>
+      </div>
+      <div class="card panel">
+        <div class="panel-head">
+          <div>
+            <div>最近消息</div>
+            <span class="head-sub">玩家发言和系统消息的实时摘要</span>
+          </div>
+        </div>
+        <div class="logbox" id="dash-recent"><div class="pmeta">暂无新消息</div></div>
+      </div>
+      <div class="card panel">
+        <div class="panel-head">运行日志</div>
+        <div class="logbox" id="dash-log"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-players">
+      <div class="page-hero">
+        <div>
+          <div class="page-kicker">PLAYERS</div>
+          <h2>玩家管理</h2>
+          <p>查看在线玩家，处理踢出、给物品、传送、封禁等日常事务。</p>
+        </div>
+        <div class="page-hero-badge">玩家页</div>
+      </div>
+      <div class="card panel">
+        <div class="panel-head">
+          玩家列表
+          <input type="text" id="player-search" placeholder="搜索玩家…" class="search" />
+        </div>
+        <div class="player-list" id="player-list"></div>
+      </div>
+      <div class="card panel blacklist-card">
+        <div class="ops-card-head">
+          <div><strong>内置黑名单</strong><span>把捣乱的人挡在门外，可设时长，到期自动解除</span></div>
+          <div class="ops-card-actions">
+            <button class="mini-btn" id="blacklist-refresh">刷新</button>
+            <button class="mini-btn primary" id="blacklist-open-add">加入黑名单</button>
+          </div>
+        </div>
+        <div class="blacklist-list" id="blacklist-list"></div>
+      </div>
+      <!-- 加入黑名单弹层卡 -->
+      <div class="config-drawer" id="blacklist-sheet" style="display:none">
+        <div class="config-drawer-card">
+          <div class="panel-head">
+            <span>加入黑名单</span>
+            <button class="mini-btn" id="blacklist-sheet-close" style="margin-left:auto">关闭</button>
+          </div>
+          <div class="form-grid">
+            <label class="wide">玩家名<input id="blacklist-name" list="blacklist-player-options" placeholder="输入玩家名，或从玩家操作卡带入" /></label>
+            <datalist id="blacklist-player-options"></datalist>
+            <label>限制时长<select id="blacklist-duration">
+              <option value="0">永久</option>
+              <option value="10">10 分钟</option>
+              <option value="60">1 小时</option>
+              <option value="1440">1 天</option>
+              <option value="10080">7 天</option>
+              <option value="custom">自定义分钟</option>
+            </select></label>
+            <label>自定义分钟<input id="blacklist-custom-duration" type="number" min="1" placeholder="例如 30" /></label>
+            <label class="wide">原因<input id="blacklist-reason" placeholder="例如：恶意破坏、刷屏、违规物品" /></label>
+          </div>
+          <div class="action-row">
+            <button class="btn" id="blacklist-add">加入黑名单并立即拦截</button>
+            <span class="pmeta">到期会自动清理；在线玩家会被自动踢出。</span>
+          </div>
+        </div>
+      </div>
+      <!-- 玩家操作弹层卡：点玩家行弹出，桌面居中 / 手机底部抽屉 -->
+      <div class="config-drawer" id="player-sheet" style="display:none">
+        <div class="config-drawer-card">
+          <div class="panel-head">
+            <span id="player-sheet-title">玩家操作</span>
+            <button class="mini-btn" id="player-sheet-close" style="margin-left:auto">关闭</button>
+          </div>
+          <div class="player-detail" id="player-detail">点击上方玩家查看详情</div>
+          <div class="player-extra" id="player-extra" style="display:none"></div>
+          <div class="sheet-manage">
+            <div class="ops-card-head">
+              <div><strong>玩家处理</strong><span>不用记指令，点几下就能管理这个玩家</span></div>
+            </div>
+            <div class="form-grid">
+              <label class="wide">选择玩家<select id="mgr-player"><option value="">暂无在线玩家</option></select></label>
+              <label>给物品<input id="mgr-give-item" placeholder="diamond_sword / apple" /></label>
+              <label>数量<input id="mgr-give-count" type="number" min="1" max="6400" value="1" /></label>
+              <label class="wide">传送目标<select id="mgr-tp-target"><option value="">选择目标玩家</option></select></label>
+              <label>X<input id="mgr-tp-x" placeholder="0" /></label>
+              <label>Y<input id="mgr-tp-y" placeholder="80" /></label>
+              <label>Z<input id="mgr-tp-z" placeholder="0" /></label>
+              <label class="wide">踢出原因<input id="mgr-kick-reason" value="由 Web 面板移出" /></label>
+            </div>
+            <div class="ops-actions">
+              <button class="pill-action" data-player-action="gamemode" data-mode="creative">创造</button>
+              <button class="pill-action" data-player-action="gamemode" data-mode="survival">生存</button>
+              <button class="pill-action" data-player-action="give">给物品</button>
+              <button class="pill-action" data-player-action="tp_player">传送到玩家</button>
+              <button class="pill-action" data-player-action="tp_pos">传送到坐标</button>
+              <button class="pill-action danger-soft" data-player-action="kick">踢出</button>
+              <button class="pill-action danger-soft" data-player-action="clear">清背包</button>
+            </div>
+            <details class="advanced-box">
+              <summary>危险操作，谨慎使用（会直接影响玩家）</summary>
+              <div class="action-row">
+                <button class="mini-btn" data-player-action="op">授予 OP</button>
+                <button class="mini-btn" data-player-action="deop">取消 OP</button>
+                <button class="mini-btn danger" data-player-action="kill">击杀</button>
+              </div>
+            </details>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-world">
+      <div class="ops-hero">
+        <div>
+          <div class="ops-kicker">SERVER</div>
+          <h2>服务器</h2>
+          <p>控制服务器的时间、天气、难度与规则，常用命令一键执行。</p>
+        </div>
+        <div class="ops-score">
+          <span>在线玩家</span>
+          <strong id="mgr-online">0</strong>
+        </div>
+      </div>
+
+      <div class="ops-grid">
+        <div class="card ops-card wide">
+          <div class="ops-card-head">
+            <div><strong>世界控制</strong><span>时间、天气、难度、规则</span></div>
+          </div>
+          <div class="ops-section">
+            <div class="ops-label">时间</div>
+            <div class="pill-row">
+              <button class="pill-action" data-world-action="time" data-value="day" title="把时间切到白天，适合建设和巡视。">白天</button>
+              <button class="pill-action" data-world-action="time" data-value="night" title="把时间切到夜晚。">夜晚</button>
+              <button class="pill-action" data-world-action="time" data-value="noon" title="把时间切到正午。">正午</button>
+              <button class="pill-action" data-world-action="time" data-value="midnight" title="把时间切到午夜。">午夜</button>
+            </div>
+          </div>
+          <div class="ops-section">
+            <div class="ops-label">天气</div>
+            <div class="pill-row">
+              <button class="pill-action" data-world-action="weather" data-value="clear" title="清空天气，恢复晴天。">晴天</button>
+              <button class="pill-action" data-world-action="weather" data-value="rain" title="开始下雨。">下雨</button>
+              <button class="pill-action" data-world-action="weather" data-value="thunder" title="切到雷暴天气。">雷暴</button>
+            </div>
+          </div>
+          <div class="ops-section">
+            <div class="ops-label">难度</div>
+            <div class="pill-row">
+              <button class="pill-action" data-world-action="difficulty" data-value="peaceful" title="切换为和平难度，敌对生物更少。">和平</button>
+              <button class="pill-action" data-world-action="difficulty" data-value="easy" title="切换为简单难度。">简单</button>
+              <button class="pill-action" data-world-action="difficulty" data-value="normal" title="切换为普通难度。">普通</button>
+              <button class="pill-action" data-world-action="difficulty" data-value="hard" title="切换为困难难度。">困难</button>
+            </div>
+          </div>
+          <div class="ops-section">
+            <div class="ops-label">常用规则</div>
+            <div class="rule-grid">
+              <button class="rule-card" data-rule="keepInventory" data-rule-value="true" title="开启后：玩家死亡时保留背包和经验，更适合生存服和新手服。"><strong>死亡不掉落</strong><span>开启：死亡后保留背包</span></button>
+              <button class="rule-card" data-rule="showCoordinates" data-rule-value="true" title="开启后：玩家界面显示当前坐标，方便找路和集合。"><strong>显示坐标</strong><span>开启：界面直接看坐标</span></button>
+              <button class="rule-card" data-rule="mobGriefing" data-rule-value="false" title="关闭后：苦力怕、末影人等不会轻易破坏方块。"><strong>防苦力怕破坏</strong><span>关闭：减少生物破坏</span></button>
+              <button class="rule-card" data-rule="doWeatherCycle" data-rule-value="false" title="关闭后：天气不会自动变化，适合长期锁定晴天或雨天。"><strong>锁定天气</strong><span>关闭：天气不再自动变化</span></button>
+            </div>
+          </div>
+          <details class="advanced-box">
+            <summary>高级规则（不熟悉的话建议保持默认）</summary>
+            <div class="form-grid compact">
+              <label>游戏规则<select id="mgr-gamerule" title="选择要修改的游戏规则"><option value="keepInventory">死亡不掉落</option><option value="mobGriefing">生物破坏</option><option value="doDaylightCycle">昼夜循环</option><option value="doWeatherCycle">天气循环</option><option value="doMobSpawning">生物生成</option><option value="showCoordinates">显示坐标</option><option value="doFireTick">火焰蔓延</option><option value="pvp">PVP</option><option value="showDeathMessages">死亡消息</option><option value="commandBlockOutput">命令方块输出</option><option value="sendCommandFeedback">命令反馈</option><option value="doImmediateRespawn">立即重生</option></select></label>
+              <label>规则值<select id="mgr-gamerule-value" title="true 表示开启，false 表示关闭"><option value="true">开启</option><option value="false">关闭</option></select></label>
+            </div>
+            <div class="action-row"><button class="mini-btn primary" id="mgr-set-gamerule">应用规则</button></div>
+          </details>
+        </div>
+
+        <div class="card ops-card">
+          <div class="ops-card-head">
+            <div><strong>常用命令</strong><span>常用的服务器命令，点一下直接执行</span></div>
+          </div>
+          <div class="command-grid" id="mgr-templates"></div>
+        </div>
+
+        <div class="card ops-card">
+          <div class="ops-card-head">
+            <div><strong>操作记录</strong><span>最近的管理动作与结果</span></div>
+          </div>
+          <div class="op-log" id="mgr-op-log"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-chat">
+      <div class="page-hero">
+        <div>
+          <div class="page-kicker">MESSAGES</div>
+          <h2>消息</h2>
+          <p>和服务器对话：发公告、聊天、执行命令，服务器的回应都会显示在下方。</p>
+        </div>
+        <div class="page-hero-badge">消息与命令</div>
+      </div>
+      <div class="card panel talk-card single-console-card">
+        <div class="panel-head">
+          <div>
+            <div>消息与命令</div>
+            <span class="head-sub">发的聊天、下的命令，以及服务器的回应都会出现在这里</span>
+          </div>
+        </div>
+        <div class="unified-feed" id="unified-feed"></div>
+      </div>
+      <div class="card unified-composer">
+        <div class="composer-row">
+          <select id="send-mode">
+            <option value="chat">聊天</option>
+            <option value="command">命令</option>
+          </select>
+          <select id="chat-identity">
+            <option value="console">面板身份</option>
+            <option value="bot">机器人 /say</option>
+            <option value="custom">自定义身份</option>
+          </select>
+          <input type="text" id="chat-custom-name" placeholder="身份名，如：服主 / 管理员" style="display:none" />
+          <select id="cmd-identity" style="display:none">
+            <option value="ws" selected>WebSocket (ws)</option>
+            <option value="wo">控制台身份 (wo)</option>
+            <option value="cmd">机器人玩家 (cmd)</option>
+            <option value="ai">魔法命令 (ai)</option>
+            <option value="native">ToolDelta 原生命令</option>
+          </select>
+          <input type="text" id="unified-input" placeholder="输入聊天内容，回车发送…" />
+          <button class="btn" id="unified-send">发送</button>
+        </div>
+        <div class="composer-hint" id="composer-hint">聊天会发送到游戏公共频道；选择“自定义身份”可以填写显示名称。</div>
+      </div>
+    </section>
+
+    <section class="view" id="view-plugins">
+      <div class="page-hero">
+        <div>
+          <div class="page-kicker">PLUGINS</div>
+          <h2>插件管理</h2>
+          <p>开启、关闭、设置或删除已安装的插件。想要新功能，去「插件市场」看看。</p>
+        </div>
+        <div class="page-hero-badge">插件页</div>
+      </div>
+      <div class="card panel">
+        <div class="panel-head">
+          已安装插件
+          <button class="btn" id="plugin-update-all" style="margin-left:auto">更新全部</button>
+        </div>
+        <div class="plugin-notice" id="plugin-notice" style="display:none"></div>
+        <div class="plugin-list" id="plugin-list"></div>
+      </div>
+      <div class="config-drawer" id="plugin-config-drawer" style="display:none">
+        <div class="config-drawer-card">
+          <div class="panel-head">
+            <span id="plugin-config-title">插件配置</span>
+            <button class="mini-btn" id="plugin-config-close" style="margin-left:auto">关闭</button>
+          </div>
+          <div class="plugin-config-form" id="plugin-config-form"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-market">
+      <div class="page-hero">
+        <div>
+          <div class="page-kicker">MARKET</div>
+          <h2>插件市场</h2>
+          <p>给服务器挑选新功能，插件与整合包一键下载安装。</p>
+        </div>
+        <div class="page-hero-badge">市场页</div>
+      </div>
+      <div class="card panel">
+        <div class="panel-head">插件市场</div>
+        <div class="market-toolbar">
+          <select id="market-rule">
+            <option value="all">随便逛逛</option>
+            <option value="name">按插件名</option>
+            <option value="author">按作者</option>
+            <option value="id">按 ID</option>
+          </select>
+          <input type="text" id="market-kw" placeholder="关键词…" class="search grow" />
+          <button class="btn" id="market-search">搜索</button>
+        </div>
+        <div class="market-list" id="market-list"></div>
+        <div class="pager" id="market-pager"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-settings">
+      <div class="page-hero">
+        <div>
+          <div class="page-kicker">SETTINGS</div>
+          <h2>设置</h2>
+          <p>配置服务器的启动与连接方式，通常填一次即可；需要时也能管理运行文件。</p>
+        </div>
+        <div class="page-hero-badge">设置页</div>
+      </div>
+      <div class="card panel">
+        <div class="panel-head">启动配置</div>
+        <div class="config-form" id="config-form"></div>
+        <div style="margin-top:14px">
+          <button class="btn" id="config-save">保存配置</button>
+          <span id="config-msg" style="margin-left:10px"></span>
+        </div>
+      </div>
+      <div class="card panel">
+        <div class="panel-head">
+          文件管理
+          <span class="file-breadcrumb" id="file-crumb" style="margin-left:10px;color:var(--muted);font-size:12px">/</span>
+          <button class="mini-btn primary" id="file-upload-btn" style="margin-left:auto">上传</button>
+          <button class="mini-btn primary" id="file-new-file">新建文件</button>
+          <button class="mini-btn" id="file-new-dir">新建目录</button>
+          <input type="file" id="file-upload-input" multiple style="display:none" />
+        </div>
+        <div class="file-list" id="file-list"></div>
+        <div class="pager" id="file-pager"></div>
+      </div>
+      <div class="card panel" id="file-editor-panel" style="display:none">
+        <div class="panel-head">
+          <span id="file-editor-name">文件</span>
+          <button class="mini-btn primary" id="file-save" style="margin-left:auto">保存</button>
+          <button class="mini-btn" id="file-close">关闭</button>
+        </div>
+        <div class="file-editor" id="file-editor"></div>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="toast-root" id="toast-root"></div>
+<!-- 市场详情弹层卡：桌面居中 / 手机底部抽屉 -->
+<div class="config-drawer" id="market-detail-panel" style="display:none">
+  <div class="config-drawer-card">
+    <div class="panel-head">
+      <span id="market-detail-title">插件详情</span>
+      <button class="mini-btn" id="market-detail-close" style="margin-left:auto">关闭</button>
+    </div>
+    <div class="plugin-notice" id="market-notice" style="display:none"></div>
+    <div class="market-detail" id="market-detail"></div>
+  </div>
+</div>
+<div class="config-drawer" id="confirm-sheet" style="display:none">
+  <div class="config-drawer-card confirm-card">
+    <div class="panel-head">
+      <span id="confirm-title">请确认</span>
+      <button class="mini-btn" id="confirm-cancel" style="margin-left:auto" title="关闭">×</button>
+    </div>
+    <div class="confirm-body" id="confirm-body"></div>
+    <div class="action-row">
+      <button class="mini-btn" id="confirm-no" style="margin-left:auto">再想想</button>
+      <button class="mini-btn danger" id="confirm-yes">确认</button>
+    </div>
+  </div>
+</div>
+<div class="config-drawer" id="prompt-sheet" style="display:none">
+  <div class="config-drawer-card prompt-card">
+    <div class="panel-head">
+      <span id="prompt-title">输入信息</span>
+      <button class="mini-btn" id="prompt-cancel" style="margin-left:auto" title="关闭">×</button>
+    </div>
+    <div class="prompt-body" id="prompt-body"></div>
+    <div class="action-row">
+      <button class="mini-btn primary" id="prompt-yes" style="margin-left:auto">确认</button>
+    </div>
+  </div>
+</div>
+<script src="/app.js?v=20260905-guide2"></script>
+</body>
+</html>

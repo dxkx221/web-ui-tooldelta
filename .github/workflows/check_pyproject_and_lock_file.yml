@@ -1,0 +1,45 @@
+name: Check PyProject and Lock File
+
+
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "pyproject.toml"
+      - "poetry.lock"
+  pull_request:
+    branches: [ main ]
+    paths:
+      - "pyproject.toml"
+      - "poetry.lock"
+  workflow_dispatch: {}
+
+
+
+jobs:
+  Checker:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set Up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Dependencies
+        run: pip install poetry
+
+      - name: Lock and Check
+        run: |
+            poetry lock
+            poetry check
+      - name: Submit Changes
+        uses: EndBug/add-and-commit@v9
+        with:
+          default_author: github_actions
+          message: "[AUTO] Lock Poetry Files"
+          add: "poetry.lock"
