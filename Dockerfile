@@ -1,10 +1,10 @@
-
+﻿
 ARG BASE_IMAGE=python:3.12-slim
 FROM ${BASE_IMAGE}
 ENV TZ=Asia/Shanghai
 ENV PYTHONPATH=/app
 ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple
-ENV PIP_EXTRA_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple https://pypi.org/simple"
+ENV PIP_EXTRA_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple"
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 ENV PYTHONUNBUFFERED=1
 ENV TOOLDELTA_DATA_DIR=/app

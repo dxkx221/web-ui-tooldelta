@@ -158,10 +158,8 @@ def ensure_credentials() -> dict:
                 data["instance_id"] = allocation["instance_id"]
                 data["public_url"] = allocation.get("url")
                 data["allocation_key"] = allocation.get("key")
-                if allocation.get("username") and allocation.get("password"):
-                    data["username"] = allocation["username"]
-                    data["password"] = allocation["password"]
-                    data["password_hash"] = generate_password_hash(allocation["password"])
+                # 注意：已有本地账密时绝不用分配器返回的账密覆盖 ——
+                # 客户可能已持有并保存了原账密，换号会导致老客户登录失败。
                 changed = True
         if data.get("instance_id") and not data.get("public_url"):
             data["public_url"] = _public_url(str(data["instance_id"]))

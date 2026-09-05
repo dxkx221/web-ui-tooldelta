@@ -960,10 +960,13 @@ function switchView(name, options = {}) {
 // ---------- 新手引导条 ----------
 const GUIDE_KEY = "shenyi:guideDone";
 function configDone() {
-  // CONFIG_DATA 里存在有效配置字段（启动器编号或配置内容）即视为已配置
+  // 与后端 startup_check 语义一致：必须选了启动器（非交互模式）且必填项齐全
   const d = CONFIG_DATA || {};
-  const keys = Object.keys(d).filter((k) => !["launch_mode", "record_log", "github_mirror", "plugin_market", "fbtoken"].includes(k));
-  return keys.some((k) => d[k] !== undefined && d[k] !== null && String(d[k]) !== "") || (d.launch_mode > 0);
+  const mode = Number(d.launch_mode) || 0;
+  if (mode <= 0) return false; // 0 = 交互选择，还没真正选定启动器
+  if (!d.current_launcher) return false;
+  const missing = Array.isArray(d.missing_required) ? d.missing_required : [];
+  return missing.length === 0;
 }
 function renderGuide() {
   const card = $("#guide-card");
@@ -2034,8 +2037,12 @@ async function loadConfig() {
     fetch("/api/config/schema").then(r => r.json()),
     fetch("/api/config").then(r => r.json()),
   ]);
+  // 展示排序：内置验证（Jasmine）置顶，但保留原始 index 供保存用
   const raw = s.data || [];
-  CONFIG_SCHEMA = raw.slice().sort((a, b) => a.index - b.index);
+  CONFIG_SCHEMA = raw.slice().sort((a, b) => {
+    if (!!a.recommended !== !!b.recommended) return a.recommended ? -1 : 1;
+    return a.index - b.index;
+  });
   CONFIG_DATA = c.data || {};
   renderConfigForm();
 }
@@ -2055,30 +2062,92 @@ function renderConfigForm() {
 
   html += '<div class="frow">';
   html += '<div class="fgroup"><label>记录日志</label><select id="cfg-log"><option value="1" ' + (d.record_log ? 'selected' : '') + '>开启</option><option value="0" ' + (!d.record_log ? 'selected' : '') + '>关闭</option></select></div>';
-  html += '<div class="fgroup"><label>全局 GitHub 镜像（留空则启动时自动测速选择）</label><input id="cfg-mirror" value="' + escapeHtml(d.github_mirror || '') + '" placeholder="https://github.tooldelta.top" /></div>';
+  html += '<div class="fgroup"><label>全局 GitHub 镜像（留空=内置验证自动/非内置交互）</label><input id="cfg-mirror" value="' + escapeHtml(d.github_mirror || '') + '" placeholder="https://ghproxy.net" /></div>';
   html += '</div>';
   html += '<div class="fgroup"><label>插件市场源（留空=默认官方）</label><input id="cfg-market" value="' + escapeHtml(d.plugin_market || '') + '" placeholder="https://pm.tooldelta.top" /></div>';
 
   if (launchMode >= 1 && launchMode <= CONFIG_SCHEMA.length) {
     const meta = findLauncher(launchMode);
     if (!meta) return;
-    html += `<h4>${escapeHtml(meta.name)} 专属配置</h4>`;
+    html += `<h4>${escapeHtml(meta.name)} 专属配置${meta.recommended ? ' <span class="badge op">推荐 · 只填密钥即可</span>' : ''}</h4>`;
     const seg = d.current_section || {};
 
-    if (!meta.fields.length) {
-      html += '<div class="pmeta">该启动器无需额外配置。</div>';
+    if (meta.builtin) {
+      // 内置验证：全部靠便捷操作区覆盖（绑 token / 拉密钥 / 验证回填），不渲染任何正式字段。
+      // 服务器号/密码由密钥自动解析，验证服务器地址与 fbtoken 由心跳/硬编码自动获取。
+      html += '<div class="uc-box">';
+      html += '<h5>内置验证便捷操作</h5>';
+      html += '<div class="frow">';
+      html += '<div class="fgroup"><label>用户中心 Token（可选，填了做归属校验）</label><input id="uc-token" value="' + escapeHtml(seg['用户中心Token'] || '') + '" placeholder="粘贴 token 后点「绑定」" /></div>';
+      html += '<div class="fgroup" style="align-self:flex-end"><button class="mini-btn" type="button" onclick="ucBindToken()">绑定 token</button> <button class="mini-btn" type="button" onclick="ucListKeys()">拉取我的密钥</button></div>';
+      html += '</div>';
+      html += '<div class="frow">';
+      html += '<div class="fgroup"><label>服务器密钥（必填）</label><input id="uc-key" value="' + escapeHtml(seg['密钥'] || '') + '" placeholder="粘贴密钥后点「验证并回填」" /></div>';
+      html += '<div class="fgroup" style="align-self:flex-end"><button class="mini-btn primary" type="button" onclick="ucResolveKey()">验证并回填</button></div>';
+      html += '</div>';
+      html += '<div class="uc-msg" id="uc-msg"></div>';
+      html += '</div>';
+    } else {
+      if (!meta.fields.length) {
+        html += '<div class="pmeta">该启动器无需额外配置。</div>';
+      }
+      let first = true;
+      for (const f of meta.fields) {
+        if (first) { html += '<div class="frow">'; first = false; }
+        html += `<div class="fgroup"><label>${escapeHtml(f.label)}</label><input id="seg-${escapeHtml(f.k)}" type="${f.type}" value="${escapeHtml(seg[f.k] || '')}" /></div>`;
+      }
+      if (!first) html += '</div>';
+      // 非内置验证才需要手动填 fbtoken；内置验证从心跳/硬编码自动获取
+      html += '<h4>验证凭证</h4>';
+      html += '<div class="fgroup"><label>fbtoken（原版验证需填写）</label><input id="cfg-fbtoken" value="' + escapeHtml(d.fbtoken || '') + '" placeholder="粘贴 fbtoken…" /></div>';
     }
-    let first = true;
-    for (const f of meta.fields) {
-      if (first) { html += '<div class="frow">'; first = false; }
-      html += `<div class="fgroup"><label>${escapeHtml(f.label)}</label><input id="seg-${escapeHtml(f.k)}" type="${f.type}" value="${escapeHtml(seg[f.k] || '')}" /></div>`;
-    }
-    if (!first) html += '</div>';
-    html += '<h4>验证凭证</h4>';
-    html += '<div class="fgroup"><label>fbtoken（原版验证需填写）</label><input id="cfg-fbtoken" value="' + escapeHtml(d.fbtoken || '') + '" placeholder="粘贴 fbtoken…" /></div>';
   }
 
   form.innerHTML = html;
+}
+
+function ucMsg(text, ok) {
+  const el = $("#uc-msg");
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = ok ? "var(--green)" : "var(--red)";
+}
+
+async function ucBindToken() {
+  const token = ($("#uc-token") || {}).value || "";
+  if (!token.trim()) { ucMsg("请先填写 token", false); return; }
+  const r = await fetch("/api/uc/bind_token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: token.trim() }) });
+  const j = await r.json();
+  ucMsg(j.ok ? "Token 已绑定" : (j.error || "绑定失败"), j.ok);
+}
+
+async function ucListKeys() {
+  const token = ($("#uc-token") || {}).value || "";
+  const r = await fetch("/api/uc/keys?token=" + encodeURIComponent(token.trim()));
+  const j = await r.json();
+  if (!j.ok) { ucMsg(j.error || "拉取失败", false); return; }
+  const keys = j.data || [];
+  if (!keys.length) { ucMsg("该 token 下暂无密钥", false); return; }
+  const el = $("#uc-key");
+  const first = keys[0];
+  const firstKey = first.key || first.serverKey || "";
+  if (el && firstKey) el.value = firstKey;
+  const titles = keys.map((k) => (k.name || k.remark || "密钥") + " (" + (k.serverNumber || k.roomId || "?") + ")").join("、");
+  ucMsg("已拉取 " + keys.length + " 个密钥：" + titles, true);
+}
+
+async function ucResolveKey() {
+  const key = ($("#uc-key") || {}).value || "";
+  const token = ($("#uc-token") || {}).value || "";
+  if (!key.trim()) { ucMsg("请先填写密钥", false); return; }
+  ucMsg("验证中…", true);
+  const r = await fetch("/api/uc/resolve_key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: key.trim(), token: token.trim() }) });
+  const j = await r.json();
+  if (!j.ok) { ucMsg(j.error || "验证失败", false); return; }
+  const d = j.data || {};
+  // 验证通过：把 token（若有）写回 token 输入框；服务器号/密码由框架启动时自动解析，无需手动回填
+  if (token.trim()) { const t = $("#uc-token"); if (t) t.value = token.trim(); }
+  ucMsg("密钥有效，服务器号 " + (d.server_number ?? "?") + "，启动时将自动解析并连接", true);
 }
 
 function onLauncherChange() {
@@ -2101,9 +2170,17 @@ $("#config-save").onclick = async () => {
   if (launchMode >= 1 && launchMode <= CONFIG_SCHEMA.length) {
     const meta = findLauncher(launchMode);
     if (meta) {
-      for (const f of meta.fields) {
-        const el = document.getElementById(`seg-${f.k}`);
-        if (el) payload.section[f.k] = el.value.trim();
+      if (meta.builtin) {
+        // 内置验证：直接从便捷操作区读取密钥与 token，服务器号/密码/验证地址/fbtoken 由框架自动解析/拉取
+        const keyEl = $("#uc-key");
+        const tokEl = $("#uc-token");
+        if (keyEl) payload.section["密钥"] = keyEl.value.trim();
+        if (tokEl) payload.section["用户中心Token"] = tokEl.value.trim();
+      } else {
+        for (const f of meta.fields) {
+          const el = document.getElementById(`seg-${f.k}`);
+          if (el) payload.section[f.k] = el.value.trim();
+        }
       }
     }
   }
