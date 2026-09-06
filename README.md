@@ -137,4 +137,7 @@ main.py                    CLI 入口（原版菜单）
 
 - 本仓库为 [ToolDelta](https://github.com/ToolDelta/ToolDelta) 的二改发行版，遵循 **BSD 3-Clause License**，详见 [LICENSE](LICENSE)。
 - 感谢 ToolDelta 及插件生态的开发者们。
-- 神翼面板（`web_panel/` 及本仓库新增内容）版权归神之翼工作室所有，同样以 BSD 3-Clause 开源。
+- 神翼面板（`web_panel/` 及本仓库新增内容）版权归神之翼工作室所有，以 BSD 3-Clause 开源；
+  **开源免费仅限个人学习与非商业用途，任何商业使用（销售、收费部署/托管、以本软件为基础提供收费服务等）
+  须事先获得作者授权**，详见 [LICENSE](LICENSE) 第 4 条。
+- 商用授权请联系作者：**QQ 1955306516**（神之翼工作室）。
