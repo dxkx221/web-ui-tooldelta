@@ -24,6 +24,25 @@ PLUGIN_DATA_DIR = PROJECT_ROOT / "插件数据文件"
 LOG_DIR = PROJECT_ROOT / "日志文件"
 PANEL_DATA_DIR = PROJECT_ROOT / "web_panel_data"
 
+
+def persist_dir() -> Path:
+    """跨容器重建需要保留的数据目录。
+
+    容器里 web_panel_data 是匿名卷（重建会换新的），而凭据所在的 /data 是挂载卷会保留。
+    因此玩家名册、玩家动态等需要长期留存的数据统一放到凭据文件同目录。
+    本地开发无环境变量时退回 web_panel_data。
+    """
+    env = os.environ.get("SHENYI_CREDENTIALS_FILE")
+    if env:
+        try:
+            return Path(env).expanduser().resolve().parent
+        except Exception:
+            pass
+    return PANEL_DATA_DIR
+
+
+PERSIST_DIR = persist_dir()
+
 # 静态资源
 STATIC_DIR = PANEL_DIR / "static"
 
@@ -73,6 +92,8 @@ __all__ = [
     "PLUGIN_DATA_DIR",
     "LOG_DIR",
     "PANEL_DATA_DIR",
+    "PERSIST_DIR",
+    "persist_dir",
     "STATIC_DIR",
     "ensure_dirs",
     "ensure_root_cwd",

@@ -142,7 +142,7 @@ def _parse_server_number_or_code(value):
 
 
 def _load_original_access_point_data(launch_data: dict, launcher_type: type):
-    """不使用内置验证服务时，走原版本地配置逻辑。"""
+    """按原版 ToolDelta 的方式从本地配置读取接入点信息。"""
     server_key = "房间号" if launcher_type is FrameTanGameAccessPoint else "服务器号"
     serverNumber = launch_args.get("server") or launch_data.get(server_key, "")
     if serverNumber in (0, "0", "", None):

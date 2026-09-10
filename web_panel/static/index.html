@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>神翼面板 · ToolDelta Server Console</title>
-<link rel="stylesheet" href="/style.css?v=20260905-guidefix" />
+<link rel="stylesheet" href="/style.css?v=20260910-ui2" />
 </head>
 <body>
 <div class="layout">
@@ -80,6 +80,16 @@
           <div class="stat-value" id="dash-bot">—</div>
         </div>
       </div>
+      <div class="card panel" id="online-chart-card">
+        <div class="ops-card-head">
+          <div><strong>在线人数 <em class="new-badge">新</em></strong><span>最近 24 小时的在线人数变化</span></div>
+          <div class="ops-card-actions">
+            <span class="pmeta" id="online-chart-stats"></span>
+            <button class="mini-btn" id="online-chart-refresh">刷新</button>
+          </div>
+        </div>
+        <div class="online-chart" id="online-chart"></div>
+      </div>
       <div class="card panel">
         <div class="panel-head">
           <div>
@@ -94,6 +104,8 @@
           <button class="quick-link" data-go="plugins"><span class="ql-ic"></span><span>管理插件</span></button>
           <button class="quick-link" data-go="market"><span class="ql-ic"></span><span>安装新插件</span></button>
           <button class="quick-link" data-go="settings"><span class="ql-ic"></span><span>启动配置 / 文件</span></button>
+          <button class="quick-link" data-go="world" data-open="perm-admin"><span class="ql-ic"></span><span>权限管理</span></button>
+          <button class="quick-link" data-go="players" data-open="roster"><span class="ql-ic"></span><span>玩家名册</span></button>
         </div>
       </div>
       <div class="card panel">
@@ -116,7 +128,7 @@
         <div>
           <div class="page-kicker">PLAYERS</div>
           <h2>玩家管理</h2>
-          <p>查看在线玩家，处理踢出、给物品、传送、封禁等日常事务。</p>
+          <p>查看在线玩家，处理踢出、给物品、传送、封禁；历史玩家名册能追溯到改过名的人。</p>
         </div>
         <div class="page-hero-badge">玩家页</div>
       </div>
@@ -127,16 +139,100 @@
         </div>
         <div class="player-list" id="player-list"></div>
       </div>
-      <div class="card panel blacklist-card">
+      <div class="card panel" id="activity-card">
+        <div class="ops-card-head">
+          <div><strong>玩家动态 <em class="new-badge">新</em></strong><span>谁什么时候进来、什么时候离开、在线多久</span></div>
+          <div class="ops-card-actions">
+            <span class="pmeta" id="activity-stats"></span>
+            <button class="mini-btn primary" id="activity-open">查看动态</button>
+          </div>
+        </div>
+      </div>
+      <div class="config-drawer" id="activity-sheet" style="display:none">
+        <div class="config-drawer-card">
+          <div class="panel-head">
+            <span>玩家动态</span>
+            <button class="mini-btn" id="activity-refresh">刷新</button>
+            <button class="mini-btn" id="activity-close" style="margin-left:auto">关闭</button>
+          </div>
+          <div class="activity-list" id="activity-list"></div>
+        </div>
+      </div>
+
+      <div class="card panel" id="roster-card">
+        <div class="ops-card-head">
+          <div><strong>历史玩家名册 <em class="new-badge">新</em></strong><span>曾上过线的玩家，改了名也能认出；可一键拉黑</span></div>
+          <div class="ops-card-actions">
+            <span class="pmeta" id="roster-count"></span>
+            <button class="mini-btn primary" id="roster-open">查看名册</button>
+          </div>
+        </div>
+      </div>
+      <div class="config-drawer" id="roster-sheet" style="display:none">
+        <div class="config-drawer-card">
+          <div class="panel-head">
+            <span>历史玩家名册</span>
+            <button class="mini-btn" id="roster-refresh">刷新</button>
+            <button class="mini-btn" id="roster-close" style="margin-left:auto">关闭</button>
+          </div>
+          <div class="roster-list" id="roster-list"></div>
+        </div>
+      </div>
+      <div class="card panel blacklist-card" id="blacklist-card">
         <div class="ops-card-head">
           <div><strong>内置黑名单</strong><span>把捣乱的人挡在门外，可设时长，到期自动解除</span></div>
           <div class="ops-card-actions">
-            <button class="mini-btn" id="blacklist-refresh">刷新</button>
+            <span class="pmeta" id="blacklist-count"></span>
+            <button class="mini-btn" id="blacklist-open-list">查看名单</button>
             <button class="mini-btn primary" id="blacklist-open-add">加入黑名单</button>
           </div>
         </div>
-        <div class="blacklist-list" id="blacklist-list"></div>
       </div>
+      <div class="config-drawer" id="blacklist-list-sheet" style="display:none">
+        <div class="config-drawer-card">
+          <div class="panel-head">
+            <span>黑名单</span>
+            <button class="mini-btn" id="blacklist-refresh">刷新</button>
+            <button class="mini-btn" id="blacklist-close-list" style="margin-left:auto">关闭</button>
+          </div>
+          <div class="blacklist-list" id="blacklist-list"></div>
+        </div>
+      </div>
+      <div class="card panel" id="gate-card">
+        <div class="ops-card-head">
+          <div><strong>进服审核 <em class="new-badge">新</em></strong><span>开启后只有白名单里的玩家能进服；新玩家会先被请出，等你批准</span></div>
+          <div class="ops-card-actions">
+            <span class="pmeta" id="gate-count"></span>
+            <button class="mini-btn" id="gate-open">查看名单</button>
+            <label class="ui-switch"><input type="checkbox" id="gate-toggle" /><span class="ui-slider"></span></label>
+          </div>
+        </div>
+      </div>
+      <div class="config-drawer" id="gate-sheet" style="display:none">
+        <div class="config-drawer-card">
+          <div class="panel-head">
+            <span>进服审核</span>
+            <button class="mini-btn" id="gate-refresh">刷新</button>
+            <button class="mini-btn" id="gate-close" style="margin-left:auto">关闭</button>
+          </div>
+          <div class="ops-label">待审批 <span class="pmeta" id="gate-pending-count"></span></div>
+          <div class="gate-list" id="gate-pending"></div>
+          <div class="ops-label" style="margin-top:12px">白名单 <span class="pmeta" id="gate-approved-count"></span></div>
+          <div class="gate-list" id="gate-approved"></div>
+          <div class="ops-label" style="margin-top:14px">被请出时看到的提示语</div>
+          <div class="chatlog-search">
+            <input type="text" id="gate-message" placeholder="例如：本服已开启进服审核，请等待管理员批准后再进入" />
+            <button class="mini-btn primary" id="gate-msg-save">保存</button>
+          </div>
+          <div class="pmeta">可用 {player} 代表玩家名；留空则使用默认提示语。</div>
+          <div class="pill-row" style="margin:8px 0 4px">
+            <button class="pill-action" onclick="gateUsePreset('本服已开启进服审核，请等待管理员批准后再进入')">默认</button>
+            <button class="pill-action" onclick="gateUsePreset('{player}，本服开启了进服审核，请先联系服主申请白名单～')">申请白名单</button>
+            <button class="pill-action" onclick="gateUsePreset('需管理员批准后才能进服')">简短</button>
+          </div>
+        </div>
+      </div>
+
       <!-- 加入黑名单弹层卡 -->
       <div class="config-drawer" id="blacklist-sheet" style="display:none">
         <div class="config-drawer-card">
@@ -214,11 +310,32 @@
         <div>
           <div class="ops-kicker">SERVER</div>
           <h2>服务器</h2>
-          <p>控制服务器的时间、天气、难度与规则，常用命令一键执行。</p>
+          <p>控制服务器的时间、天气、难度与规则；常用命令一键执行，还能管理管理员权限。</p>
         </div>
         <div class="ops-score">
           <span>在线玩家</span>
           <strong id="mgr-online">0</strong>
+        </div>
+      </div>
+
+      <div class="card ops-card wide" id="perm-admin-card">
+        <div class="ops-card-head">
+          <div><strong>权限管理 <em class="new-badge">新</em></strong><span>查看和管理服务器管理员（按 XUID 识别，改过名也能认出）</span></div>
+          <div class="ops-card-actions">
+            <span class="pmeta" id="perm-admin-count">—</span>
+            <button class="mini-btn primary" id="perm-admin-open">查看管理员</button>
+          </div>
+        </div>
+      </div>
+      <div class="config-drawer" id="perm-admin-sheet" style="display:none">
+        <div class="config-drawer-card">
+          <div class="panel-head">
+            <span>管理员名单</span>
+            <button class="mini-btn" id="perm-admin-refresh">刷新</button>
+            <button class="mini-btn" id="perm-admin-close" style="margin-left:auto">关闭</button>
+          </div>
+          <div class="perm-admin-list" id="perm-admin-list"></div>
+          <div class="perm-hint" style="margin-top:10px">在玩家操作里可设置管理员 / 成员 / 访客 / 自定义权限。</div>
         </div>
       </div>
 
@@ -286,6 +403,7 @@
           <div class="op-log" id="mgr-op-log"></div>
         </div>
       </div>
+
     </section>
 
     <section class="view" id="view-chat">
@@ -296,6 +414,17 @@
           <p>和服务器对话：发公告、聊天、执行命令，服务器的回应都会显示在下方。</p>
         </div>
         <div class="page-hero-badge">消息与命令</div>
+      </div>
+      <div class="card panel" id="chatlog-card">
+        <div class="ops-card-head">
+          <div><strong>聊天记录检索 <em class="new-badge">新</em></strong><span>输入关键词查历史发言（存在面板本机，不联网、不消耗 AI）</span></div>
+        </div>
+        <div class="chatlog-search">
+          <input type="text" id="chatlog-q" placeholder="输入关键词，如玩家名 / 内容…" />
+          <button class="mini-btn primary" id="chatlog-search-btn">搜索</button>
+          <button class="mini-btn" id="chatlog-clear">看最新</button>
+        </div>
+        <div class="chatlog-list" id="chatlog-list"></div>
       </div>
       <div class="card panel talk-card single-console-card">
         <div class="panel-head">
@@ -463,6 +592,19 @@
     </div>
   </div>
 </div>
-<script src="/app.js?v=20260905-guidefix"></script>
+<div class="config-drawer" id="perm-sheet" style="display:none">
+  <div class="config-drawer-card">
+    <div class="panel-head">
+      <span>自定义权限</span>
+      <button class="mini-btn" id="perm-close" style="margin-left:auto" onclick="closePermEditor()" title="关闭">×</button>
+    </div>
+    <div class="perm-body" id="perm-body"></div>
+    <input type="hidden" id="perm-xuid" />
+    <div class="action-row">
+      <button class="mini-btn primary" id="perm-apply" style="margin-left:auto" onclick="applyPermCustom()">应用权限</button>
+    </div>
+  </div>
+</div>
+<script src="/app.js?v=20260910-ui2"></script>
 </body>
 </html>

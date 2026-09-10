@@ -2,8 +2,8 @@
 
 关键设计（不碰框架源码）：
 - `ConfigLoader.load_tooldelta_cfg_and_get_launcher()` 的交互点全部可被「预置配置文件」绕过：
-    * launchMode 非 0          -> 跳过启动器选择（不 input）
-    * 「全局GitHub镜像」非空    -> 跳过镜像测速配置（不 input）
+    * launchMode 非 0          -> 跳过 _select_validation_mode_and_launcher（不 input）
+    * 「全局GitHub镜像」非空    -> 跳过 _configure_github_mirror_interactive（不 input）
     * 原版：服务器号/密码/验证服务器地址非空 -> 不 input；fbtoken 需写 fbtoken 文件（否则 if_token 会 input）
 - 因此 Web 端只需把表单写入配置文件（+ 可选 fbtoken 文件），即可让框架无 TTY 启动。
 """
@@ -229,7 +229,7 @@ def save_config(payload: dict) -> dict:
     if launch_mode not in range(0, len(LAUNCHERS) + 1):
         return {"ok": False, "error": "启动器序号不合法"}
 
-    # Web 后台线程下 launchMode=0 会触发交互选择（input()）卡死，因此必须选具体启动器
+    # Web 后台线程下 launchMode=0 会走 _select_validation_mode_and_launcher() 触发 input() 卡死
     if launch_mode == 0:
         return {"ok": False, "error": "Web 模式下必须选择具体启动器（不能选交互选择），否则后台启动会卡死"}
 
@@ -251,8 +251,7 @@ def save_config(payload: dict) -> dict:
 
     cfg["启动器启动模式(请不要手动更改此项, 改为0可重置)"] = launch_mode
     cfg["是否记录日志"] = bool(payload.get("record_log", True))
-    # 镜像留空会导致框架首次启动时交互测速（无 TTY 卡死），故给默认官方镜像
-    cfg["全局GitHub镜像"] = str(payload.get("github_mirror", "") or "").strip() or "https://github.tooldelta.top"
+    cfg["全局GitHub镜像"] = str(payload.get("github_mirror", "") or "").strip()
     cfg["插件市场源"] = str(payload.get("plugin_market", "") or "").strip()
 
     if seg and 1 <= launch_mode <= len(LAUNCHERS):

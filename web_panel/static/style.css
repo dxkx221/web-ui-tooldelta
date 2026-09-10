@@ -108,8 +108,8 @@ body.modal-open {
 .view.view-enter { animation: paneIn .22s ease both; }
 
 @keyframes paneIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-bottom: 14px; }
@@ -1322,12 +1322,14 @@ body:before {
   .config-drawer {
     align-items: flex-end;
     padding: 0;
+    height: 100dvh;
+    max-height: 100dvh;
     overscroll-behavior: contain;
   }
 
   .config-drawer-card {
     width: 100vw;
-    max-height: 92vh;
+    max-height: 88dvh;
     border-radius: 26px 26px 0 0;
     padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
     display: flex;
@@ -1705,7 +1707,7 @@ body:before {
 @media (max-width: 760px) {
   #player-sheet .config-drawer-card {
     width: 100vw;
-    max-height: 92vh;
+    max-height: 88dvh;
   }
   #player-sheet .player-detail,
   #player-sheet .player-extra {
@@ -1966,4 +1968,156 @@ body:before {
 @keyframes cardIn {
   from { opacity: 0; transform: translateY(10px) scale(.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+
+/* ---------- 权限管理（/permission） ---------- */
+.perm-presets { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 4px; }
+.perm-presets .pill-action:disabled { opacity: .45; cursor: not-allowed; }
+.perm-hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
+.perm-body { padding: 4px 2px; }
+.perm-field-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
+.perm-chip { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); border-radius: 12px; font-size: 13px; cursor: pointer; user-select: none; }
+.perm-chip:hover { border-color: rgba(141,124,255,.45); }
+.perm-chip input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+
+/* 权限管理名单（服务器页） */
+.perm-admin-list { display: flex; flex-direction: column; gap: 10px; max-height: 62vh; overflow: auto; }
+.perm-admin-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 14px; border: 1px solid rgba(124,133,168,.18); border-radius: 14px;
+  background: rgba(255,255,255,.32); animation: riseIn .25s ease both;
+}
+.perm-admin-info { min-width: 0; }
+.pa-name { font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.pa-name .badge { font-size: 11px; }
+.pa-sub { color: var(--muted); font-size: 12px; margin-top: 3px; word-break: break-all; }
+.perm-admin-actions { display: flex; gap: 8px; flex: none; }
+.perm-hint { color: var(--muted); font-size: 12px; }
+
+/* 历史玩家名册（玩家页） */
+.roster-list { display: flex; flex-direction: column; gap: 8px; max-height: 62vh; overflow: auto; }
+.roster-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 14px; border: 1px solid rgba(124,133,168,.16); border-radius: 13px;
+  background: rgba(255,255,255,.3); animation: riseIn .25s ease both;
+}
+.roster-info { min-width: 0; }
+.roster-name { font-weight: 600; font-size: 14px; }
+.roster-sub { color: var(--muted); font-size: 12px; margin-top: 2px; word-break: break-all; }
+.roster-actions { display: flex; gap: 8px; flex: none; }
+
+/* 玩家动态（玩家页，进出记录） */
+.activity-list { display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow: auto; }
+.activity-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 14px; border: 1px solid rgba(124,133,168,.16); border-radius: 13px;
+  background: rgba(255,255,255,.3); animation: riseIn .25s ease both;
+}
+.activity-row.is-online { border-color: rgba(61,220,132,.42); background: rgba(61,220,132,.1); }
+.activity-info { min-width: 0; }
+.activity-name { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.activity-name .badge { font-size: 11px; }
+.activity-sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.activity-dur { flex: none; font-size: 12px; color: var(--muted); font-weight: 600; }
+
+/* 权限预设按钮组 */
+.perm-presets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.perm-field-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.perm-chip { display: flex; align-items: center; gap: 7px; padding: 9px 11px; border: 1px solid rgba(124,133,168,.2); border-radius: 11px; background: rgba(255,255,255,.25); font-size: 13px; }
+
+@media (max-width: 760px) {
+  .perm-admin-row, .roster-row, .activity-row { flex-wrap: wrap; }
+  .perm-admin-actions, .roster-actions { width: 100%; justify-content: flex-end; }
+  .activity-dur { width: 100%; text-align: right; }
+}
+
+
+/* 「新」标记 */
+.new-badge {
+  display: inline-block; vertical-align: middle;
+  margin-left: 6px; padding: 1px 7px;
+  font-size: 11px; font-style: normal; font-weight: 700;
+  color: #fff; border-radius: 999px;
+  background: linear-gradient(135deg, #8d7cff, #6fb7ff);
+  box-shadow: 0 2px 8px rgba(141,124,255,.35);
+}
+
+/* 快捷入口锚点定位后高亮卡片 */
+.card.flash, .ops-card.flash {
+  animation: flashRing 1.4s ease;
+}
+@keyframes flashRing {
+  0%   { box-shadow: 0 0 0 0 rgba(141,124,255,0); }
+  18%  { box-shadow: 0 0 0 4px rgba(141,124,255,.55); }
+  100% { box-shadow: 0 0 0 0 rgba(141,124,255,0); }
+}
+
+/* 新增功能卡：顶部分隔强调 */
+#perm-admin-card, #roster-card, #activity-card, #gate-card, #online-chart-card, #chatlog-card { position: relative; }
+#perm-admin-card::before, #roster-card::before, #activity-card::before, #gate-card::before, #online-chart-card::before, #chatlog-card::before {
+  content: ""; position: absolute; left: 0; top: 16px; bottom: 16px; width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: linear-gradient(180deg, #8d7cff, #6fb7ff);
+  opacity: .85;
+}
+
+/* 在线人数曲线 */
+.online-chart { position: relative; min-height: 150px; }
+.online-svg { display: block; width: 100%; height: 150px; overflow: visible; }
+.chart-grid { stroke: rgba(124,133,168,.26); stroke-width: 1; }
+.chart-grid-v { stroke-dasharray: 3 4; stroke: rgba(124,133,168,.2); }
+.chart-line { fill: none; stroke: #8d7cff; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-dot { fill: #fff; stroke: #8d7cff; stroke-width: 1.6; }
+.chart-cur { fill: #8d7cff; stroke: #fff; stroke-width: 2; }
+.chart-curlab { position: absolute; padding: 1px 7px; border-radius: 8px; font-size: 11px; font-weight: 700; color: #6b5bd6; background: rgba(255,255,255,.82); border: 1px solid rgba(141,124,255,.35); white-space: nowrap; pointer-events: none; }
+.chart-curlab.left { transform: translateX(-100%); }
+.chart-x span { white-space: nowrap; }
+.chart-y { position: absolute; left: 0; top: 0; width: 32px; height: 150px; pointer-events: none; }
+.chart-y .cy { position: absolute; left: 0; width: 30px; text-align: right; font-size: 10px; line-height: 1; color: var(--muted); }
+.chart-x { position: absolute; left: 34px; right: 14px; bottom: 0; display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); }
+.chart-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 140px; text-align: center; color: var(--muted); font-size: 12px; }
+.chart-empty strong { font-size: 14px; color: var(--text); }
+
+/* 聊天记录检索 */
+.chatlog-search { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+.chatlog-search input { flex: 1; min-width: 160px; }
+.chatlog-list { display: flex; flex-direction: column; gap: 6px; max-height: 360px; overflow: auto; }
+.chatlog-row { display: flex; gap: 10px; align-items: baseline; padding: 8px 12px; border: 1px solid rgba(124,133,168,.14); border-radius: 11px; background: rgba(255,255,255,.28); font-size: 13px; animation: riseIn .22s ease both; }
+.chatlog-time { color: var(--muted); font-size: 12px; flex: none; }
+.chatlog-who { font-weight: 700; flex: none; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chatlog-msg { min-width: 0; word-break: break-word; }
+
+/* 进服审核开关 */
+.ui-switch { position: relative; display: inline-flex; width: 46px; height: 26px; flex: none; }
+.ui-switch input { opacity: 0; width: 0; height: 0; }
+.ui-slider { position: absolute; inset: 0; border-radius: 999px; background: rgba(124,133,168,.35); transition: background .2s; }
+.ui-slider::before { content: ""; position: absolute; width: 20px; height: 20px; left: 3px; top: 3px; border-radius: 50%; background: #fff; transition: transform .2s; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+.ui-switch input:checked + .ui-slider { background: linear-gradient(135deg,#8d7cff,#6fb7ff); }
+.ui-switch input:checked + .ui-slider::before { transform: translateX(20px); }
+
+/* 进服审核名单 */
+.gate-list { display: flex; flex-direction: column; gap: 8px; max-height: 210px; overflow: auto; }
+.gate-list:empty { display: none; }
+.gate-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border: 1px solid rgba(124,133,168,.16); border-radius: 12px; background: rgba(255,255,255,.3); animation: riseIn .25s ease both; }
+.gate-info { min-width: 0; }
+.gate-name { font-weight: 600; font-size: 14px; }
+.gate-sub { color: var(--muted); font-size: 12px; margin-top: 2px; word-break: break-all; }
+.gate-actions { display: flex; gap: 8px; flex: none; }
+@media (max-width: 760px) {
+  .gate-row { flex-wrap: wrap; }
+  .gate-actions { width: 100%; justify-content: flex-end; }
+}
+
+/* ---------- 卡片头：统一操作区 + 移动端自适应 ---------- */
+.ops-card-head .ops-card-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex: none; flex-wrap: wrap; justify-content: flex-end; }
+.ops-card-head .ops-card-actions .pmeta { margin: 0; }
+@media (max-width: 760px) {
+  .ops-card-head { flex-wrap: wrap; row-gap: 10px; }
+  .ops-card-head .ops-card-actions { flex: 1 1 100%; justify-content: flex-end; margin-left: 0; }
+  .ops-card-head .ops-card-actions .mini-btn { min-height: 34px; }
+  #chatlog-card .chatlog-search input,
+  #gate-sheet .chatlog-search input { min-height: 38px; }
+  .gate-list { max-height: 160px; }
 }

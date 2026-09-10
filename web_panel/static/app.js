@@ -717,8 +717,19 @@ async function loadPlayerDetail(name) {
       html += `<div class="k">命令等级</div><div>${ab.command_permissions}</div>`;
       html += `</div>`;
     }
+    const xuid = (p.xuid || "").trim();
+    const xu = xuid ? "'" + xuid + "'" : "''";
     html += `<div class="easy-player-card" style="margin-top:14px">`;
-    html += `<div class="easy-title">玩家管理入口</div>`;
+    html += `<div class="easy-title">权限管理</div>`;
+    html += `<div class="perm-presets">`;
+    html += `<button class="pill-action" onclick="permSet(${xu},'11111111')" ${xuid?'':'disabled'}>设为管理员</button>`;
+    html += `<button class="pill-action" onclick="permSet(${xu},'11111100')" ${xuid?'':'disabled'}>设为成员</button>`;
+    html += `<button class="pill-action" onclick="permSet(${xu},'00000000')" ${xuid?'':'disabled'}>设为访客</button>`;
+    html += `<button class="pill-action danger-soft" onclick="permRevoke(${xu})" ${xuid?'':'disabled'}>撤销管理员</button>`;
+    html += `<button class="pill-action" onclick="openPermEditor(${xu})" ${xuid?'':'disabled'}>自定义权限</button>`;
+    html += `</div>`;
+    if (!xuid) html += `<div class="perm-hint">该玩家没有 XUID，无法在线设置权限。</div>`;
+    html += `<div class="easy-title" style="margin-top:12px">玩家管理入口</div>`;
     html += `<div class="easy-actions">`;
     html += actionButton("查看背包", "inventory", { player: p.name });
     html += actionButton("查看位置", "position", { player: p.name });
@@ -733,6 +744,568 @@ async function loadPlayerDetail(name) {
   } catch (e) {
     box.textContent = "加载失败";
   }
+}
+
+// ---------- 权限管理（/permission，走 AI 魔法命令） ----------
+const PERM_FIELDS = [
+  { key: "build", label: "建造" },
+  { key: "mine", label: "挖掘" },
+  { key: "doors_and_switches", label: "门/开关" },
+  { key: "open_containers", label: "打开容器" },
+  { key: "attack_players", label: "攻击玩家" },
+  { key: "attack_mobs", label: "攻击生物" },
+  { key: "operator_commands", label: "管理员命令" },
+  { key: "teleport", label: "传送命令" },
+];
+
+async function permSet(xuid, flags) {
+  if (!xuid) { showToast("该玩家没有 XUID，无法设置权限", "warn"); return; }
+  const r = await fetch("/api/permissions/set", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ xuid, flags }) });
+  const j = await r.json();
+  if (!j.ok) { showToast(j.error || "设置权限失败", "warn"); return; }
+  const msg = (j.messages && j.messages[0]) ? j.messages[0] : "权限已设置";
+  showToast(msg, "ok");
+}
+
+async function permRevoke(xuid) {
+  if (!xuid) { showToast("该玩家没有 XUID，无法移除管理员", "warn"); return; }
+  const ok = await askConfirm("撤销管理员", "确定要撤销该玩家的管理员权限吗？（离线玩家也可操作）");
+  if (!ok) return;
+  const r = await fetch("/api/permissions/revoke", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ xuid }) });
+  const j = await r.json();
+  if (!j.ok) { showToast(j.error || "撤销失败", "warn"); return; }
+  const msg = (j.messages && j.messages[0]) ? j.messages[0] : "已撤销管理员";
+  showToast(msg, "ok");
+}
+
+function openPermEditor(xuid) {
+  if (!xuid) { showToast("该玩家没有 XUID，无法设置权限", "warn"); return; }
+  const sheet = $("#perm-sheet");
+  if (!sheet) return;
+  $("#perm-xuid").value = xuid;
+  const body = $("#perm-body");
+  let h = '<div class="perm-field-grid">';
+  for (const f of PERM_FIELDS) {
+    h += `<label class="perm-chip"><input type="checkbox" id="perm-${f.key}" value="${f.key}"> ${f.label}</label>`;
+  }
+  h += "</div>";
+  body.innerHTML = h;
+  sheet.style.display = "grid";
+  syncOverlayState();
+}
+
+function applyPermCustom() {
+  const xuid = ($("#perm-xuid").value || "").trim();
+  if (!xuid) return;
+  // 位序 bit7..bit0（与 /permission setbyxuid 一致）：传送/命令/攻击怪/攻击玩家/开容器/开关门/挖掘/建造
+  const order = ["teleport", "operator_commands", "attack_mobs", "attack_players", "open_containers", "doors_and_switches", "mine", "build"];
+  let s = "";
+  for (const k of order) {
+    const el = document.getElementById("perm-" + k);
+    s += (el && el.checked) ? "1" : "0";
+  }
+  permSet(xuid, s);
+  closePermEditor();
+}
+
+function closePermEditor() {
+  const sheet = $("#perm-sheet");
+  if (sheet) sheet.style.display = "none";
+  syncOverlayState();
+}
+
+// ---------- 管理员名单（服务器页） ----------
+async function loadPermAdmins() {
+  const box = $("#perm-admin-list");
+  if (!box) return;
+  const r = await fetch("/api/permissions/list");
+  const j = await r.json();
+  box.innerHTML = "";
+  if (!j.ok) { box.innerHTML = `<div class="empty-guide"><span>${escapeHtml(j.error || "无法获取管理员列表")}</span></div>`; return; }
+  const admins = j.data || [];
+  const cntEl = $("#perm-admin-count");
+  if (cntEl) cntEl.textContent = admins.length ? `共 ${admins.length} 人` : "暂无管理员";
+  if (!admins.length) {
+    const hint = (j.packets === 0)
+      ? '<div class="empty-guide"><strong>暂时读不到管理员名单</strong><span>服务器可能正忙或刚重连，过一会儿点「刷新」再试。</span></div>'
+      : '<div class="empty-guide"><strong>暂无管理员</strong><span>在玩家操作里点「设为管理员」即可添加。</span></div>';
+    box.innerHTML = hint;
+    return;
+  }
+  let idx = 0;
+  for (const a of admins) {
+    const row = document.createElement("div");
+    row.className = "perm-admin-row";
+    row.style.animationDelay = Math.min(idx++ * 22, 220) + "ms";
+    const names = (a.names && a.names.length) ? a.names : (a.name ? [a.name] : []);
+    const nameStr = names.map((n) => escapeHtml(n)).join(" → ");
+    const dev = a.device_id ? ` · <span style="opacity:.7">设备 ${escapeHtml(a.device_id)}</span>` : "";
+    const online = a.online ? '<span class="badge op">在线</span>' : '<span class="badge notop">离线</span>';
+    row.innerHTML = `
+      <div class="perm-admin-info">
+        <div class="pa-name">${escapeHtml(a.name || "未知玩家")} ${online}</div>
+        <div class="pa-sub">XUID ${escapeHtml(a.xuid)}${dev}</div>
+        ${names.length > 1 ? `<div class="pa-sub">曾用名：${nameStr}</div>` : ""}
+      </div>
+      <div class="perm-admin-actions">
+        <button class="mini-btn" onclick="openPermEditor('${escapeHtml(a.xuid)}')">自定义</button>
+        <button class="mini-btn danger" onclick="revokeAdmin('${escapeHtml(a.xuid)}')">移除管理员</button>
+      </div>`;
+    box.appendChild(row);
+  }
+}
+
+async function revokeAdmin(xuid) {
+  const ok = await askConfirm("移除管理员", "确定要移除该管理员吗？（离线也可操作，按 XUID 移除）");
+  if (!ok) return;
+  const r = await fetch("/api/permissions/revoke", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ xuid }) });
+  const j = await r.json();
+  if (!j.ok) { showToast(j.error || "移除失败", "warn"); } else { showToast((j.messages && j.messages[0]) || "已移除管理员", "ok"); }
+  loadPermAdmins();
+}
+
+function openPermAdminSheet() {
+  const sheet = $("#perm-admin-sheet");
+  if (!sheet) return;
+  sheet.style.display = "grid";
+  syncOverlayState();
+  loadPermAdmins();
+}
+
+function closePermAdminSheet() {
+  const sheet = $("#perm-admin-sheet");
+  if (sheet) sheet.style.display = "none";
+  syncOverlayState();
+}
+
+function openRosterSheet() {
+  const s = $("#roster-sheet");
+  if (!s) return;
+  s.style.display = "grid";
+  syncOverlayState();
+  loadRoster();
+}
+function closeRosterSheet() {
+  const s = $("#roster-sheet");
+  if (s) s.style.display = "none";
+  syncOverlayState();
+}
+function openActivitySheet() {
+  const s = $("#activity-sheet");
+  if (!s) return;
+  s.style.display = "grid";
+  syncOverlayState();
+  loadActivity();
+}
+function closeActivitySheet() {
+  const s = $("#activity-sheet");
+  if (s) s.style.display = "none";
+  syncOverlayState();
+}
+function openBlacklistListSheet() {
+  const s = $("#blacklist-list-sheet");
+  if (!s) return;
+  s.style.display = "grid";
+  syncOverlayState();
+  loadBlacklist();
+}
+function closeBlacklistListSheet() {
+  const s = $("#blacklist-list-sheet");
+  if (s) s.style.display = "none";
+  syncOverlayState();
+}
+function openGateSheet() {
+  const s = $("#gate-sheet");
+  if (!s) return;
+  s.style.display = "grid";
+  syncOverlayState();
+  loadGate();
+}
+function closeGateSheet() {
+  const s = $("#gate-sheet");
+  if (s) s.style.display = "none";
+  syncOverlayState();
+}
+
+// ---------- 历史玩家名册（玩家页） ----------
+async function loadRoster() {
+  const box = $("#roster-list");
+  if (!box) return;
+  const r = await fetch("/api/roster");
+  const j = await r.json();
+  box.innerHTML = "";
+  if (!j.ok) { box.innerHTML = `<div class="empty-guide"><span>${escapeHtml(j.error || "无法获取名册")}</span></div>`; return; }
+  const roster = j.data || [];
+  const rc = $("#roster-count");
+  if (rc) rc.textContent = roster.length ? `共 ${roster.length} 人` : "暂无";
+  if (!roster.length) { box.innerHTML = `<div class="empty-guide"><strong>暂无历史玩家</strong><span>玩家上线后会自动记录，改名也能追溯。</span></div>`; return; }
+  let idx = 0;
+  for (const e of roster) {
+    const row = document.createElement("div");
+    row.className = "roster-row";
+    row.style.animationDelay = Math.min(idx++ * 18, 200) + "ms";
+    const names = (e.names && e.names.length) ? e.names : (e.name ? [e.name] : []);
+    const existed = (e.seen_at ? new Date(e.seen_at * 1000).toLocaleString() : "");
+    row.innerHTML = `
+      <div class="roster-info">
+        <div class="roster-name">${escapeHtml(e.name || "未知玩家")}</div>
+        <div class="roster-sub">${names.length > 1 ? `曾用名：${names.map((n) => escapeHtml(n)).join(" → ")}` : ""}</div>
+        <div class="roster-sub">最近上线 ${escapeHtml(existed)}</div>
+      </div>
+      <div class="roster-actions">
+        <button class="mini-btn primary" onclick="banRosterPlayer('${escapeHtml(e.xuid)}','${escapeHtml(e.name || "")}')">拉黑</button>
+      </div>`;
+    box.appendChild(row);
+  }
+}
+
+async function banRosterPlayer(xuid, name) {
+  const sheet = $("#blacklist-sheet");
+  if (!sheet) return;
+  const input = $("#blacklist-name");
+  if (input) input.value = name || "";
+  const dur = $("#blacklist-duration");
+  if (dur) dur.value = "0";
+  sheet.dataset.xuid = xuid || "";
+  sheet.style.display = "grid";
+  syncOverlayState();
+  if (input) setTimeout(() => input.focus(), 60);
+}
+
+// ---------- 玩家动态（进出记录） ----------
+function fmtClock(ts) {
+  if (!ts) return "";
+  const d = new Date(ts * 1000);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function fmtDuration(sec) {
+  sec = Math.max(0, Math.floor(sec || 0));
+  if (sec < 60) return `${sec} 秒`;
+  const m = Math.floor(sec / 60);
+  if (m < 60) return `${m} 分钟`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm ? `${h} 小时 ${rm} 分` : `${h} 小时`;
+}
+
+async function loadActivity() {
+  const box = $("#activity-list");
+  if (!box) return;
+  let j;
+  try {
+    const r = await fetch("/api/activity?limit=120");
+    j = await r.json();
+  } catch (e) {
+    box.innerHTML = '<div class="empty-guide"><span>动态加载失败，稍后再试</span></div>';
+    return;
+  }
+  const statsEl = $("#activity-stats");
+  if (statsEl && j.stats) statsEl.textContent = `在线 ${j.stats.online} · 今日 ${j.stats.today_sessions} 次进出`;
+  const list = j.data || [];
+  if (!j.ok || !list.length) {
+    box.innerHTML = '<div class="empty-guide"><strong>还没有玩家动态</strong><span>玩家上线、离开后会自动记在这里。</span></div>';
+    return;
+  }
+  box.innerHTML = "";
+  let idx = 0;
+  for (const a of list) {
+    const row = document.createElement("div");
+    row.className = "activity-row" + (a.online ? " is-online" : "");
+    row.style.animationDelay = Math.min(idx++ * 16, 200) + "ms";
+    const badge = a.online
+      ? '<span class="badge op">在线</span>'
+      : '<span class="badge notop">已离开</span>';
+    const join = fmtClock(a.join_at);
+    const leave = a.leave_at ? fmtClock(a.leave_at) : "—";
+    row.innerHTML = `
+      <div class="activity-info">
+        <div class="activity-name">${escapeHtml(a.name || "未知玩家")} ${badge}</div>
+        <div class="activity-sub">进入 ${escapeHtml(join)} · 离开 ${escapeHtml(leave)}</div>
+      </div>
+      <div class="activity-dur">${a.online ? "在线 " : "时长 "}${escapeHtml(fmtDuration(a.duration_seconds))}</div>`;
+    box.appendChild(row);
+  }
+}
+
+// ---------- 在线人数曲线 ----------
+let _chartResizeBound = false;
+async function loadOnlineChart() {
+  const box = $("#online-chart");
+  if (!box) return;
+  let j;
+  try {
+    const r = await fetch("/api/online-history?hours=24");
+    j = await r.json();
+  } catch (e) {
+    box.innerHTML = '<div class="chart-empty"><strong>加载失败</strong><span>稍后点「刷新」再试。</span></div>';
+    return;
+  }
+  const d = j.data || {};
+  const statsEl = $("#online-chart-stats");
+  if (statsEl) statsEl.textContent = `当前 ${d.current ?? 0} · 峰值 ${d.peak ?? 0}`;
+  let pts = (d.points || [])
+    .filter((p) => Array.isArray(p) && p.length === 2 && isFinite(p[0]) && isFinite(p[1]))
+    .map((p) => [Number(p[0]), Number(p[1])]);
+  pts.sort((a, b) => a[0] - b[0]);
+  if (!pts.length) {
+    box.innerHTML = '<div class="chart-empty"><strong>还没有数据</strong><span>服务器运行一会儿后，这里会画出在线人数曲线。</span></div>';
+    return;
+  }
+  drawOnlineChart(box, pts);
+  if (!_chartResizeBound) {
+    _chartResizeBound = true;
+    let timer = null;
+    window.addEventListener("resize", () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const b = $("#online-chart");
+        if (b && b._chartPts) drawOnlineChart(b, b._chartPts);
+      }, 200);
+    });
+  }
+}
+
+function chartNiceStep(maxV) {
+  const raw = Math.max(1, maxV) / 3;
+  for (const c of [1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1000, 2000, 5000]) {
+    if (raw <= c) return c;
+  }
+  return Math.ceil(raw / 1000) * 1000;
+}
+
+function drawOnlineChart(box, pts) {
+  if (pts.length > 600) {
+    const step = Math.ceil(pts.length / 600);
+    const out = [];
+    for (let i = 0; i < pts.length; i += step) out.push(pts[i]);
+    if (out[out.length - 1] !== pts[pts.length - 1]) out.push(pts[pts.length - 1]);
+    pts = out;
+  }
+  box._chartPts = pts;
+  const W = Math.max(260, Math.round(box.clientWidth || 320));
+  const H = 150;
+  const padL = 34, padR = 14, padT = 14, padB = 22;
+  const iw = Math.max(10, W - padL - padR);
+  const ih = H - padT - padB;
+  const now = Date.now() / 1000;
+  let t1 = Math.max(now, pts[pts.length - 1][0]);
+  let t0 = Math.min(pts[0][0], t1 - 1800);
+  if (t1 - t0 > 86400) t0 = t1 - 86400;
+  const span = Math.max(1, t1 - t0);
+  const peak = Math.max(1, ...pts.map((p) => p[1]));
+  const step = chartNiceStep(peak);
+  const maxV = Math.max(step, Math.ceil(peak / step) * step);
+  const X = (t) => padL + iw * ((t - t0) / span);
+  const Y = (v) => padT + ih * (1 - v / maxV);
+
+  const fmtT = (t) => {
+    const dd = new Date(t * 1000);
+    return `${String(dd.getHours()).padStart(2, "0")}:${String(dd.getMinutes()).padStart(2, "0")}`;
+  };
+
+  // 横向（数值）网格
+  let grid = "";
+  const yLabels = [];
+  for (let v = 0; v <= maxV + 1e-9; v += step) {
+    const y = Number(Y(v).toFixed(1));
+    grid += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" class="chart-grid"/>`;
+    yLabels.push(`<span class="cy" style="top:${(y - 6).toFixed(1)}px">${Math.round(v)}</span>`);
+  }
+
+  // 纵向（时间）网格 + 刻度
+  const tickN = W >= 560 ? 3 : 2;
+  const ticks = [];
+  for (let i = 0; i <= tickN; i++) ticks.push(t0 + (span * i) / tickN);
+  ticks.forEach((t, i) => {
+    if (i === 0 || i === tickN) return;
+    const x = Number(X(t).toFixed(1));
+    grid += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${(padT + ih).toFixed(1)}" class="chart-grid chart-grid-v"/>`;
+  });
+  const xLabelsHtml = ticks
+    .map((t, i) => `<span>${fmtT(t)}${i === ticks.length - 1 ? "（现在）" : ""}</span>`)
+    .join("");
+
+  // 阶梯折线（在线人数是离散值，阶梯更准确、不产生斜线误导）
+  const first = pts[0], last = pts[pts.length - 1];
+  let line = `M ${X(first[0]).toFixed(1)} ${Y(first[1]).toFixed(1)}`;
+  let area = `M ${X(first[0]).toFixed(1)} ${Y(0).toFixed(1)} L ${X(first[0]).toFixed(1)} ${Y(first[1]).toFixed(1)}`;
+  for (let i = 1; i < pts.length; i++) {
+    const x = X(pts[i][0]).toFixed(1);
+    const yPrev = Y(pts[i - 1][1]).toFixed(1);
+    const y = Y(pts[i][1]).toFixed(1);
+    line += ` L ${x} ${yPrev} L ${x} ${y}`;
+    area += ` L ${x} ${yPrev} L ${x} ${y}`;
+  }
+  area += ` L ${X(last[0]).toFixed(1)} ${Y(0).toFixed(1)} Z`;
+
+  let dots = "";
+  if (pts.length <= 60) {
+    dots = pts.map((p) => `<circle cx="${X(p[0]).toFixed(1)}" cy="${Y(p[1]).toFixed(1)}" r="2.2" class="chart-dot"/>`).join("");
+  }
+  const cx = Number(X(last[0]).toFixed(1)), cy = Number(Y(last[1]).toFixed(1));
+  const labLeft = cx > W - 72;
+  const curLab = `<span class="chart-curlab${labLeft ? " left" : ""}" style="left:${(labLeft ? cx - 10 : cx + 10).toFixed(1)}px;top:${Math.max(0, cy - 24).toFixed(1)}px">当前 ${last[1]}</span>`;
+
+  box.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="none" class="online-svg">
+      <defs>
+        <linearGradient id="onlineGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#8d7cff" stop-opacity=".35"/>
+          <stop offset="100%" stop-color="#8d7cff" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      ${grid}
+      <path d="${area}" fill="url(#onlineGrad)" stroke="none"/>
+      <path d="${line}" class="chart-line" vector-effect="non-scaling-stroke"/>
+      ${dots}
+      <circle cx="${cx}" cy="${cy}" r="4" class="chart-cur" vector-effect="non-scaling-stroke"/>
+    </svg>
+    <div class="chart-y">${yLabels.join("")}</div>
+    <div class="chart-x">${xLabelsHtml}</div>
+    ${curLab}`;
+}
+
+// ---------- 聊天记录检索（本地，不接 AI） ----------
+async function loadChatlog(q) {
+  const box = $("#chatlog-list");
+  if (!box) return;
+  box.innerHTML = '<div class="pmeta">查询中…</div>';
+  try {
+    const r = await fetch("/api/chatlog?q=" + encodeURIComponent(q || "") + "&limit=100");
+    const j = await r.json();
+    const items = (j.data && j.data.items) || [];
+    if (!items.length) {
+      box.innerHTML = '<div class="empty-guide"><strong>没有找到记录</strong><span>换个关键词试试；玩家聊天后会自动记录在这里。</span></div>';
+      return;
+    }
+    box.innerHTML = "";
+    items.forEach((it, i) => {
+      const row = document.createElement("div");
+      row.className = "chatlog-row";
+      row.style.animationDelay = Math.min(i * 12, 160) + "ms";
+      row.innerHTML = `<span class="chatlog-time">${escapeHtml(fmtClock(it.ts))}</span>` +
+        `<span class="chatlog-who">${escapeHtml(it.player || "系统")}</span>` +
+        `<span class="chatlog-msg">${renderMc(it.msg || "")}</span>`;
+      box.appendChild(row);
+    });
+  } catch (e) {
+    box.innerHTML = '<div class="empty-guide"><span>查询失败，稍后再试</span></div>';
+  }
+}
+
+// ---------- 进服审核 / 白名单 ----------
+async function loadGate() {
+  const r = await fetch("/api/gate");
+  const j = await r.json();
+  const tg = $("#gate-toggle");
+  if (tg) tg.checked = !!j.enabled;
+  const cnt = $("#gate-count");
+  if (cnt) cnt.textContent = j.enabled ? `（已开启，共 ${j.count || 0} 人）` : "（未开启）";
+  const pend = j.pending || [];
+  const openBtn = $("#gate-open");
+  if (openBtn) {
+    openBtn.textContent = pend.length ? `查看名单 · 待审 ${pend.length}` : "查看名单";
+    openBtn.className = "mini-btn" + (pend.length ? " primary" : "");
+  }
+  const gpc = $("#gate-pending-count");
+  if (gpc) gpc.textContent = pend.length ? `${pend.length} 条` : "";
+  const gac = $("#gate-approved-count");
+  if (gac) gac.textContent = `共 ${(j.approved || []).length} 人`;
+  const gm = $("#gate-message");
+  if (gm) {
+    gm.value = j.message || "";
+    if (j.default_message) gm.placeholder = "例如：" + j.default_message;
+  }
+  const pbox = $("#gate-pending");
+  if (pbox) {
+    if (!pend.length) {
+      pbox.innerHTML = '<div class="pmeta">暂无待审批</div>';
+    } else {
+      pbox.innerHTML = "";
+      pend.forEach((p, i) => {
+        const row = document.createElement("div");
+        row.className = "gate-row";
+        row.style.animationDelay = Math.min(i * 14, 160) + "ms";
+        row.innerHTML = `<div class="gate-info"><div class="gate-name">${escapeHtml(p.name || "未知玩家")}</div>` +
+          `<div class="gate-sub">XUID ${escapeHtml(p.xuid || "")} · ${escapeHtml(fmtClock(p.ts))}</div></div>` +
+          `<div class="gate-actions"><button class="mini-btn primary" onclick="gateApprove('${escapeHtml(p.xuid || "")}','${escapeHtml(p.name || "")}')">批准</button>` +
+          `<button class="mini-btn danger" onclick="gateReject('${escapeHtml(p.xuid || "")}','${escapeHtml(p.name || "")}')">拒绝</button></div>`;
+        pbox.appendChild(row);
+      });
+    }
+  }
+  const appr = j.approved || [];
+  const abox = $("#gate-approved");
+  if (abox) {
+    if (!appr.length) {
+      abox.innerHTML = '<div class="pmeta">白名单为空。开启审核时会自动导入现有管理员。</div>';
+    } else {
+      abox.innerHTML = "";
+      appr.forEach((a, i) => {
+        const row = document.createElement("div");
+        row.className = "gate-row";
+        row.style.animationDelay = Math.min(i * 10, 160) + "ms";
+        row.innerHTML = `<div class="gate-info"><div class="gate-name">${escapeHtml(a.name || "未知玩家")}</div>` +
+          `<div class="gate-sub">XUID ${escapeHtml(a.xuid || "")}</div></div>` +
+          `<div class="gate-actions"><button class="mini-btn danger" onclick="gateRemove('${escapeHtml(a.xuid || "")}')">移出</button></div>`;
+        abox.appendChild(row);
+      });
+    }
+  }
+}
+
+async function toggleGate(enabled) {
+  try {
+    const r = await fetch("/api/gate/toggle", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }) });
+    await r.json();
+    showToast(enabled ? "已开启进服审核，正在导入现有管理员…" : "已关闭进服审核", "ok");
+  } catch (e) {
+    showToast("操作失败，请重试", "warn");
+  }
+  loadGate();
+}
+
+async function gateApprove(xuid, name) {
+  await fetch("/api/gate/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ xuid, name }) });
+  showToast(`已批准 ${name || xuid} 进服`, "ok");
+  loadGate();
+}
+
+async function gateReject(xuid, name) {
+  const ok = await askConfirm("拒绝进服", `确定拒绝 <b>${escapeHtml(name || xuid)}</b> 进服吗？`, { yesText: "拒绝" });
+  if (!ok) return;
+  await fetch("/api/gate/reject", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ xuid, name }) });
+  showToast(`已拒绝 ${name || xuid}`, "warn");
+  loadGate();
+}
+
+async function gateRemove(xuid) {
+  const ok = await askConfirm("移出白名单", `确定把该玩家移出白名单吗？移出后他将无法再进服。`, { yesText: "移出" });
+  if (!ok) return;
+  await fetch("/api/gate/remove", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ xuid }) });
+  showToast("已移出白名单", "warn");
+  loadGate();
+}
+
+async function gateSaveMessage() {
+  const el = $("#gate-message");
+  const msg = (el ? el.value : "").trim();
+  try {
+    const r = await fetch("/api/gate/message", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: msg }) });
+    const j = await r.json();
+    if (j.ok) showToast(msg ? "已保存审核提示语" : "已恢复默认提示语", "ok");
+    else showToast(j.error || "保存失败", "warn");
+  } catch (e) {
+    showToast("保存失败，请重试", "warn");
+  }
+  loadGate();
+}
+
+function gateUsePreset(t) {
+  const el = $("#gate-message");
+  if (el) el.value = t;
 }
 
 async function loadInventory(name) {
@@ -945,8 +1518,10 @@ function switchView(name, options = {}) {
   const topActions = $("#topbar-actions");
   if (topActions) topActions.style.display = name === "dashboard" ? "" : "none";
   if (name === "dashboard") renderGuide();
-  if (name === "players") { fetchPlayers(); loadBlacklist(); }
-  if (name === "world") { fetchPlayers(); loadOperationLog(); syncWorldRules(); }
+  if (name === "dashboard") loadOnlineChart();
+  if (name === "chat") loadChatlog("");
+  if (name === "players") { fetchPlayers(); loadBlacklist(); loadRoster(); loadActivity(); loadGate(); }
+  if (name === "world") { fetchPlayers(); loadOperationLog(); syncWorldRules(); loadPermAdmins(); }
   if (name === "plugins") loadPlugins();
   if (name === "market") marketSearch();
   if (name === "settings") { loadConfig(); loadFiles(""); }
@@ -1049,7 +1624,7 @@ const DIFFICULTY_STORAGE_KEY = "shenyi:lastDifficulty";
 const MOBILE_SHEET_QUERY = window.matchMedia("(max-width: 760px)");
 
 function syncOverlayState() {
-  const anyOpen = ["#plugin-config-drawer", "#market-detail-panel", "#file-editor-panel", "#player-sheet", "#blacklist-sheet", "#confirm-sheet", "#prompt-sheet"].some((selector) => {
+  const anyOpen = ["#plugin-config-drawer", "#market-detail-panel", "#file-editor-panel", "#player-sheet", "#blacklist-sheet", "#confirm-sheet", "#prompt-sheet", "#perm-sheet", "#perm-admin-sheet", "#roster-sheet", "#activity-sheet", "#blacklist-list-sheet", "#gate-sheet"].some((selector) => {
     const el = $(selector);
     return !!el && getComputedStyle(el).display !== "none";
   });
@@ -1372,6 +1947,8 @@ async function loadBlacklist() {
     const r = await fetch("/api/blacklist");
     const j = await r.json();
     const items = j.data || [];
+    const bc = $("#blacklist-count");
+    if (bc) bc.textContent = items.length ? `共 ${items.length} 人` : "无";
     if (!items.length) {
       box.innerHTML = '<div class="empty-guide">当前没有黑名单玩家。这里适合处理临时封禁、熊孩子、刷屏和违规物品问题。</div>';
       return;
@@ -1407,7 +1984,7 @@ async function addBlacklistEntry() {
   const r = await fetch("/api/blacklist/add", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, reason, duration_minutes: selectedBlacklistDuration(), kick_now: true }),
+    body: JSON.stringify({ name, reason, xuid: ($("#blacklist-sheet")?.dataset?.xuid) || "", duration_minutes: selectedBlacklistDuration(), kick_now: true }),
   });
   const j = await r.json();
   if (!j.ok) { appendLog("ERROR", j.error || "加入黑名单失败"); showToast(j.error || "加入黑名单失败", "err"); }
@@ -1456,6 +2033,15 @@ function initServerManager() {
   });
   bind("#mgr-set-gamerule", () => runWorldAction("gamerule", { rule: $("#mgr-gamerule").value, value: $("#mgr-gamerule-value").value }));
   bind("#blacklist-refresh", loadBlacklist);
+  bind("#roster-refresh", loadRoster);
+  bind("#perm-admin-refresh", loadPermAdmins);
+  bind("#activity-refresh", loadActivity);
+  bind("#online-chart-refresh", loadOnlineChart);
+  bind("#chatlog-search-btn", () => loadChatlog($("#chatlog-q").value));
+  bind("#chatlog-clear", () => { const el = $("#chatlog-q"); if (el) el.value = ""; loadChatlog(""); });
+  const clq = $("#chatlog-q");
+  if (clq) clq.addEventListener("keydown", (e) => { if (e.key === "Enter") loadChatlog(clq.value); });
+  bind("#gate-toggle", () => toggleGate($("#gate-toggle").checked));
   bind("#blacklist-add", addBlacklistEntry);
   bind("#blacklist-open-add", () => {
     const sheet = $("#blacklist-sheet");
@@ -1507,9 +2093,29 @@ function initServerManager() {
       syncOverlayState();
     }
   });
+  bind("#perm-admin-open", openPermAdminSheet);
+  bind("#perm-admin-close", closePermAdminSheet);
+  const paSheet = $("#perm-admin-sheet");
+  if (paSheet) paSheet.addEventListener("click", (e) => {
+    if (e.target.id === "perm-admin-sheet") closePermAdminSheet();
+  });
+  bind("#roster-open", openRosterSheet);
+  bind("#roster-close", closeRosterSheet);
+  bind("#activity-open", openActivitySheet);
+  bind("#activity-close", closeActivitySheet);
+  bind("#blacklist-open-list", openBlacklistListSheet);
+  bind("#blacklist-close-list", closeBlacklistListSheet);
+  bind("#gate-open", openGateSheet);
+  bind("#gate-close", closeGateSheet);
+  bind("#gate-refresh", loadGate);
+  bind("#gate-msg-save", gateSaveMessage);
+  ["#roster-sheet", "#activity-sheet", "#blacklist-list-sheet", "#gate-sheet"].forEach((sel) => {
+    const el = $(sel);
+    if (el) el.addEventListener("click", (e) => { if (e.target.id === sel.slice(1)) { el.style.display = "none"; syncOverlayState(); } });
+  });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      ["#player-sheet", "#blacklist-sheet", "#confirm-sheet", "#prompt-sheet", "#market-detail-panel"].forEach((sel) => {
+      ["#player-sheet", "#blacklist-sheet", "#confirm-sheet", "#prompt-sheet", "#market-detail-panel", "#perm-admin-sheet", "#roster-sheet", "#activity-sheet", "#blacklist-list-sheet", "#gate-sheet"].forEach((sel) => {
         const el = $(sel);
         if (el && el.style.display !== "none") {
           el.style.display = "none";
@@ -1525,7 +2131,25 @@ $$(".nav-item").forEach((b) => b.onclick = (e) => {
   e.preventDefault();
   switchView(b.dataset.view);
 });
-$$(".quick-link").forEach((b) => b.onclick = () => switchView(b.dataset.go));
+$$(".quick-link").forEach((b) => b.onclick = () => {
+  switchView(b.dataset.go);
+  const opener = b.dataset.open;
+  if (opener) {
+    const fnMap = { "perm-admin": openPermAdminSheet, "roster": openRosterSheet, "activity": openActivitySheet, "gate": openGateSheet };
+    setTimeout(() => { if (fnMap[opener]) fnMap[opener](); }, 220);
+    return;
+  }
+  const anchorId = b.dataset.anchor;
+  if (anchorId) {
+    setTimeout(() => {
+      const el = document.getElementById(anchorId);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("flash");
+      setTimeout(() => el.classList.remove("flash"), 1400);
+    }, 220);
+  }
+});
 $("#btn-start").onclick = async () => {
   const r = await fetch("/api/start", { method: "POST" });
   const j = await r.json();
@@ -1583,6 +2207,13 @@ function connectWs() {
       appendChat(item.data);
     } else if (item.type === "status") {
       applyStatus(item.data);
+    } else if (item.type === "presence") {
+      // 玩家上下线：如果正在看玩家页，实时刷新动态
+      const box = $("#activity-list");
+      if (box && box.offsetParent !== null) loadActivity();
+    } else if (item.type === "gate") {
+      const g = $("#gate-pending");
+      if (g && g.offsetParent !== null) loadGate();
     }
   };
 }
@@ -1598,6 +2229,7 @@ connectWs();
 setInterval(fetchStatus, 5000);
 setInterval(fetchPlayers, 5000);
 setInterval(loadOperationLog, 10000);
+setInterval(() => { const c = $("#online-chart"); if (c && c.offsetParent !== null) loadOnlineChart(); }, 60000);
 
 // 新手引导：跳过按钮 + 状态变化时刷新
 const guideDismiss = $("#guide-dismiss");
@@ -2037,7 +2669,7 @@ async function loadConfig() {
     fetch("/api/config/schema").then(r => r.json()),
     fetch("/api/config").then(r => r.json()),
   ]);
-  // 展示排序：内置验证（Jasmine）置顶，但保留原始 index 供保存用
+  // 展示排序：推荐项置顶，但保留原始 index 供保存用
   const raw = s.data || [];
   CONFIG_SCHEMA = raw.slice().sort((a, b) => {
     if (!!a.recommended !== !!b.recommended) return a.recommended ? -1 : 1;
@@ -2062,7 +2694,7 @@ function renderConfigForm() {
 
   html += '<div class="frow">';
   html += '<div class="fgroup"><label>记录日志</label><select id="cfg-log"><option value="1" ' + (d.record_log ? 'selected' : '') + '>开启</option><option value="0" ' + (!d.record_log ? 'selected' : '') + '>关闭</option></select></div>';
-  html += '<div class="fgroup"><label>全局 GitHub 镜像（留空=内置验证自动/非内置交互）</label><input id="cfg-mirror" value="' + escapeHtml(d.github_mirror || '') + '" placeholder="https://ghproxy.net" /></div>';
+  html += '<div class="fgroup"><label>全局 GitHub 镜像（留空=使用默认镜像源）</label><input id="cfg-mirror" value="' + escapeHtml(d.github_mirror || '') + '" placeholder="https://ghproxy.net" /></div>';
   html += '</div>';
   html += '<div class="fgroup"><label>插件市场源（留空=默认官方）</label><input id="cfg-market" value="' + escapeHtml(d.plugin_market || '') + '" placeholder="https://pm.tooldelta.top" /></div>';
 
@@ -2072,22 +2704,7 @@ function renderConfigForm() {
     html += `<h4>${escapeHtml(meta.name)} 专属配置${meta.recommended ? ' <span class="badge op">推荐 · 只填密钥即可</span>' : ''}</h4>`;
     const seg = d.current_section || {};
 
-    if (meta.builtin) {
-      // 内置验证：全部靠便捷操作区覆盖（绑 token / 拉密钥 / 验证回填），不渲染任何正式字段。
-      // 服务器号/密码由密钥自动解析，验证服务器地址与 fbtoken 由心跳/硬编码自动获取。
-      html += '<div class="uc-box">';
-      html += '<h5>内置验证便捷操作</h5>';
-      html += '<div class="frow">';
-      html += '<div class="fgroup"><label>用户中心 Token（可选，填了做归属校验）</label><input id="uc-token" value="' + escapeHtml(seg['用户中心Token'] || '') + '" placeholder="粘贴 token 后点「绑定」" /></div>';
-      html += '<div class="fgroup" style="align-self:flex-end"><button class="mini-btn" type="button" onclick="ucBindToken()">绑定 token</button> <button class="mini-btn" type="button" onclick="ucListKeys()">拉取我的密钥</button></div>';
-      html += '</div>';
-      html += '<div class="frow">';
-      html += '<div class="fgroup"><label>服务器密钥（必填）</label><input id="uc-key" value="' + escapeHtml(seg['密钥'] || '') + '" placeholder="粘贴密钥后点「验证并回填」" /></div>';
-      html += '<div class="fgroup" style="align-self:flex-end"><button class="mini-btn primary" type="button" onclick="ucResolveKey()">验证并回填</button></div>';
-      html += '</div>';
-      html += '<div class="uc-msg" id="uc-msg"></div>';
-      html += '</div>';
-    } else {
+    {
       if (!meta.fields.length) {
         html += '<div class="pmeta">该启动器无需额外配置。</div>';
       }
@@ -2097,57 +2714,13 @@ function renderConfigForm() {
         html += `<div class="fgroup"><label>${escapeHtml(f.label)}</label><input id="seg-${escapeHtml(f.k)}" type="${f.type}" value="${escapeHtml(seg[f.k] || '')}" /></div>`;
       }
       if (!first) html += '</div>';
-      // 非内置验证才需要手动填 fbtoken；内置验证从心跳/硬编码自动获取
+      // 原版验证服务器需要填 fbtoken
       html += '<h4>验证凭证</h4>';
       html += '<div class="fgroup"><label>fbtoken（原版验证需填写）</label><input id="cfg-fbtoken" value="' + escapeHtml(d.fbtoken || '') + '" placeholder="粘贴 fbtoken…" /></div>';
     }
   }
 
   form.innerHTML = html;
-}
-
-function ucMsg(text, ok) {
-  const el = $("#uc-msg");
-  if (!el) return;
-  el.textContent = text;
-  el.style.color = ok ? "var(--green)" : "var(--red)";
-}
-
-async function ucBindToken() {
-  const token = ($("#uc-token") || {}).value || "";
-  if (!token.trim()) { ucMsg("请先填写 token", false); return; }
-  const r = await fetch("/api/uc/bind_token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: token.trim() }) });
-  const j = await r.json();
-  ucMsg(j.ok ? "Token 已绑定" : (j.error || "绑定失败"), j.ok);
-}
-
-async function ucListKeys() {
-  const token = ($("#uc-token") || {}).value || "";
-  const r = await fetch("/api/uc/keys?token=" + encodeURIComponent(token.trim()));
-  const j = await r.json();
-  if (!j.ok) { ucMsg(j.error || "拉取失败", false); return; }
-  const keys = j.data || [];
-  if (!keys.length) { ucMsg("该 token 下暂无密钥", false); return; }
-  const el = $("#uc-key");
-  const first = keys[0];
-  const firstKey = first.key || first.serverKey || "";
-  if (el && firstKey) el.value = firstKey;
-  const titles = keys.map((k) => (k.name || k.remark || "密钥") + " (" + (k.serverNumber || k.roomId || "?") + ")").join("、");
-  ucMsg("已拉取 " + keys.length + " 个密钥：" + titles, true);
-}
-
-async function ucResolveKey() {
-  const key = ($("#uc-key") || {}).value || "";
-  const token = ($("#uc-token") || {}).value || "";
-  if (!key.trim()) { ucMsg("请先填写密钥", false); return; }
-  ucMsg("验证中…", true);
-  const r = await fetch("/api/uc/resolve_key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: key.trim(), token: token.trim() }) });
-  const j = await r.json();
-  if (!j.ok) { ucMsg(j.error || "验证失败", false); return; }
-  const d = j.data || {};
-  // 验证通过：把 token（若有）写回 token 输入框；服务器号/密码由框架启动时自动解析，无需手动回填
-  if (token.trim()) { const t = $("#uc-token"); if (t) t.value = token.trim(); }
-  ucMsg("密钥有效，服务器号 " + (d.server_number ?? "?") + "，启动时将自动解析并连接", true);
 }
 
 function onLauncherChange() {
@@ -2170,17 +2743,9 @@ $("#config-save").onclick = async () => {
   if (launchMode >= 1 && launchMode <= CONFIG_SCHEMA.length) {
     const meta = findLauncher(launchMode);
     if (meta) {
-      if (meta.builtin) {
-        // 内置验证：直接从便捷操作区读取密钥与 token，服务器号/密码/验证地址/fbtoken 由框架自动解析/拉取
-        const keyEl = $("#uc-key");
-        const tokEl = $("#uc-token");
-        if (keyEl) payload.section["密钥"] = keyEl.value.trim();
-        if (tokEl) payload.section["用户中心Token"] = tokEl.value.trim();
-      } else {
-        for (const f of meta.fields) {
-          const el = document.getElementById(`seg-${f.k}`);
-          if (el) payload.section[f.k] = el.value.trim();
-        }
+      for (const f of meta.fields) {
+        const el = document.getElementById(`seg-${f.k}`);
+        if (el) payload.section[f.k] = el.value.trim();
       }
     }
   }

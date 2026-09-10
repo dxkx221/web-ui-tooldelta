@@ -129,6 +129,76 @@ document.getElementById('login-form').onsubmit=async(e)=>{e.preventDefault();con
         except RuntimeError as e:
             return jsonify({"ok": False, "error": str(e)}), 409
 
+    @app.get("/api/roster")
+    def api_roster():
+        # 玩家名册：XUID -> 当前名 + 历史名（改名可追溯），供权限/黑名单/历史玩家使用
+        try:
+            return jsonify({"ok": True, "data": bridge.manager._player_roster()})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+
+    @app.get("/api/activity")
+    def api_activity():
+        # 玩家动态：上下线时间线（含在线时长），持久化在 /data
+        try:
+            limit = request.args.get("limit", 100)
+            return jsonify({
+                "ok": True,
+                "data": bridge.manager.player_activity(limit),
+                "stats": bridge.manager.activity_stats(),
+            })
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+
+    @app.get("/api/online-history")
+    def api_online_history():
+        # 在线人数采样曲线
+        try:
+            return jsonify({"ok": True, "data": bridge.manager.online_history(request.args.get("hours", 24))})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+
+    @app.get("/api/gate")
+    def api_gate():
+        # 进服审核 / 白名单状态
+        try:
+            return jsonify({"ok": True, **bridge.manager.gate_state()})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+
+    @app.post("/api/gate/toggle")
+    def api_gate_toggle():
+        data = request.get_json(silent=True) or {}
+        return jsonify(bridge.manager.gate_set_enabled(bool(data.get("enabled"))))
+
+    @app.post("/api/gate/approve")
+    def api_gate_approve():
+        data = request.get_json(silent=True) or {}
+        return jsonify(bridge.manager.gate_approve(data.get("xuid"), data.get("name", "")))
+
+    @app.post("/api/gate/reject")
+    def api_gate_reject():
+        data = request.get_json(silent=True) or {}
+        return jsonify(bridge.manager.gate_reject(data.get("xuid"), data.get("name", "")))
+
+    @app.post("/api/gate/remove")
+    def api_gate_remove():
+        data = request.get_json(silent=True) or {}
+        return jsonify(bridge.manager.gate_remove(data.get("xuid")))
+
+    @app.post("/api/gate/message")
+    def api_gate_message():
+        data = request.get_json(silent=True) or {}
+        return jsonify(bridge.manager.gate_set_message(data.get("message", "")))
+
+    @app.get("/api/chatlog")
+    def api_chatlog():
+        # 聊天记录检索（本地关键词，不接 AI）
+        try:
+            return jsonify({"ok": True, "data": bridge.manager.chatlog_search(request.args.get("q", ""), request.args.get("limit", 100))})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+
     @app.post("/api/start")
     def api_start():
         check = config_service.startup_check()
@@ -184,6 +254,21 @@ document.getElementById('login-form').onsubmit=async(e)=>{e.preventDefault();con
     def api_server_ops():
         return jsonify({"ok": True, "data": bridge.manager.operation_log()})
 
+    @app.get("/api/permissions/list")
+    def api_permissions_list():
+        return jsonify(bridge.manager.permission_list())
+
+    @app.post("/api/permissions/set")
+    def api_permissions_set():
+        data = request.get_json(silent=True) or {}
+        return jsonify(bridge.manager.permission_set(
+            data.get("xuid", ""), data.get("flags", "")))
+
+    @app.post("/api/permissions/revoke")
+    def api_permissions_revoke():
+        data = request.get_json(silent=True) or {}
+        return jsonify(bridge.manager.permission_revoke(data.get("xuid", "")))
+
     @app.get("/api/blacklist")
     def api_blacklist():
         include_expired = request.args.get("include_expired", "0") in ("1", "true", "yes")
@@ -192,14 +277,16 @@ document.getElementById('login-form').onsubmit=async(e)=>{e.preventDefault();con
     @app.post("/api/blacklist/add")
     def api_blacklist_add():
         data = request.get_json(silent=True) or {}
+        xuid = data.get("xuid", "")
         result = blacklist_service.add_entry(
             data.get("name") or data.get("player", ""),
             data.get("reason", ""),
             data.get("duration_minutes", 0),
             data.get("operator", "Web 面板"),
+            xuid,
         )
         if result.get("ok") and data.get("kick_now", True):
-            bridge.manager.enforce_blacklist_once(result["data"]["name"], result["data"])
+            bridge.manager.enforce_blacklist_once(result["data"]["name"], result["data"], xuid)
         return jsonify(result)
 
     @app.post("/api/blacklist/remove")

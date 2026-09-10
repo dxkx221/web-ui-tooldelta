@@ -74,32 +74,41 @@ def list_entries(include_expired: bool = False) -> dict:
     return {"ok": True, "data": out}
 
 
-def find_active(name: str) -> dict | None:
+def find_active(name: str, xuid: str = "") -> dict | None:
     cleanup_expired()
     normalized = _normalize_name(name).lower()
-    if not normalized:
+    x = (xuid or "").strip().lower()
+    if not normalized and not x:
         return None
     for item in _load():
-        if _normalize_name(item.get("name")).lower() == normalized and not _is_expired(item):
+        name_hit = normalized and _normalize_name(item.get("name")).lower() == normalized
+        xuid_hit = x and str(item.get("xuid", "") or "").lower() == x
+        if (name_hit or xuid_hit) and not _is_expired(item):
             return item
     return None
 
 
-def add_entry(name: str, reason: str = "", duration_minutes: int | float | str = 0, operator: str = "Web 面板") -> dict:
+def add_entry(name: str, reason: str = "", duration_minutes: int | float | str = 0, operator: str = "Web 面板", xuid: str = "") -> dict:
     name = _normalize_name(name)
     if not name:
         return {"ok": False, "error": "玩家名不能为空"}
     reason = str(reason or "").strip() or "未填写原因"
+    x = (xuid or "").strip().lower()
     try:
         duration = float(duration_minutes or 0)
     except Exception:
         duration = 0
     now = _now()
     expires_at = None if duration <= 0 else now + duration * 60
-    items = [i for i in _load() if _normalize_name(i.get("name")).lower() != name.lower()]
+    # 同名或同 XUID 去重（改名后按 XUID 命中，避免重复拉黑）
+    items = [
+        i for i in _load()
+        if not (_normalize_name(i.get("name")).lower() == name.lower() or (x and str(i.get("xuid", "") or "").lower() == x))
+    ]
     entry = {
         "id": uuid.uuid4().hex,
         "name": name,
+        "xuid": x or None,
         "reason": reason[:120],
         "created_at": now,
         "expires_at": expires_at,
