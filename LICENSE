@@ -17,32 +17,6 @@ modification, are permitted provided that the following conditions are met:
    contributors may be used to endorse or promote products derived from
    this software without specific prior written permission.
 
-4. 商用授权补充条款（Commercial Use Clause）
-
-   本软件允许个人学习、研究及非商业性用途免费使用、修改与再分发。
-   任何形式的商业使用，均须事先获得版权人“神之翼工作室”的授权。
-   商业授权可通过以下两种方式之一获得：
-
-   方式一：贡献式授权（开源共建）
-   以“共同维护者”身份持续参与本项目的开发维护——每月至少提交一次
-   被正式合并（merge）的 Pull Request 或同等维护记录，即可获得当月
-   的商业授权；月度贡献记录中断后，商业授权相应失效。
-
-   方式二：付费授权
-   按 99 元/月购买商业授权。
-
-   商业使用行为包括但不限于：
-
-   （1）将本软件或其修改版本直接或间接用于商业产品、商业项目；
-   （2）向第三方销售、出租本软件或其修改版本；
-   （3）以本软件或其修改版本为基础，对外提供收费的部署、托管或
-        运维服务（含 SaaS）；
-   （4）企业或组织内部以盈利为目的的使用。
-
-   商用授权联系方式（作者）：QQ 1955306516
-
-   未经授权进行上述商业使用行为的，版权人保留追究法律责任的权利。
-
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
